@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRight, Loader2, Lock, Mail, User as UserIcon, Eye, EyeOff, Phone, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, ArrowRight, Loader2, Lock, Mail, User as UserIcon, Eye, EyeOff, Phone, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -141,7 +141,11 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             .eq('id', user.id);
 
           if (updateError) {
-             console.error(updateError);
+             console.error('Update Error:', updateError);
+             // Código 23505 = Unique Constraint Violation (Telefone duplicado)
+             if (updateError.code === '23505' || updateError.message?.toLowerCase().includes('duplicate')) {
+                 throw new Error('Este telefone já está cadastrado em outra conta. Use outro número ou faça login na conta original.');
+             }
              throw new Error('Erro ao salvar perfil. Tente novamente.');
           }
 
@@ -242,6 +246,20 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
           >
+            {/* Quick Logout for Profile Completion */}
+            {isCompletingProfile && (
+              <button 
+                onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.reload();
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+                title="Sair desta conta"
+              >
+                <LogOut size={18} />
+              </button>
+            )}
+
             <div className="p-8">
               <div className="flex justify-between items-center mb-6">
                 <div>

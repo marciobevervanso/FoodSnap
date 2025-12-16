@@ -14,7 +14,7 @@ import AdminPanel from './components/AdminPanel';
 import FAQPage from './components/FAQPage'; // Import novo
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
 
 export interface User {
   id: string;
@@ -224,8 +224,39 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // NEW: Rota "Completar Perfil" (Onboarding)
+  // Remove a landing page do fundo para focar o usuário na conclusão do cadastro
+  if (user && isProfileIncomplete) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
+             {/* Background estilizado */}
+             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
+             <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/30 rounded-full blur-3xl"></div>
+             <div className="absolute top-40 -left-20 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl"></div>
+
+             <RegistrationModal 
+                isOpen={true} 
+                onClose={() => {}} 
+                plan={selectedPlan}
+                mode="register"
+                isCompletingProfile={true}
+                onSuccess={handleAuthSuccess}
+             />
+             
+             {/* Botão de Sair de emergência caso o usuário queira trocar de conta */}
+             <div className="absolute bottom-8 left-0 right-0 text-center">
+                <button 
+                  onClick={handleLogout}
+                  className="text-gray-500 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 mx-auto transition-colors"
+                >
+                  <LogOut size={16} /> Cancelar e Sair
+                </button>
+             </div>
+        </div>
+      );
+  }
+
   // Rota Pública (Landing Page ou FAQ Page)
-  // Nota: Se user existe mas isProfileIncomplete é true, renderiza a Home mas com o Modal aberto
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900">
       <Header 
@@ -256,15 +287,10 @@ const AppContent: React.FC = () => {
       />
       
       <RegistrationModal 
-        // Abre se o usuário clicou OU se o perfil estiver incompleto (força abertura)
-        isOpen={isModalOpen || (!!user && isProfileIncomplete)} 
-        onClose={() => {
-            // Só permite fechar se não for obrigatório completar o perfil
-            if (!isProfileIncomplete) setIsModalOpen(false);
-        }} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
         plan={selectedPlan}
         mode={authMode}
-        isCompletingProfile={!!user && isProfileIncomplete}
         onSuccess={handleAuthSuccess}
       />
       
