@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calculator, Droplets, Activity, Scale, ChevronRight, ArrowRight, Check, Dumbbell, Flame, Heart, Percent } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { X, Calculator, Droplets, Activity, Scale, ArrowRight, Dumbbell, Flame, Heart, Percent, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface CalculatorsModalProps {
@@ -17,135 +16,115 @@ const CalculatorsModal: React.FC<CalculatorsModalProps> = ({ isOpen, onClose }) 
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-        {/* Backdrop Overlay */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-gray-950/70 backdrop-blur-md"
-        />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      {/* Backdrop Overlay */}
+      <div 
+        onClick={onClose}
+        className="absolute inset-0 bg-gray-950/70 backdrop-blur-md transition-opacity"
+      />
 
-        {/* Modal Container */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white w-full max-w-6xl h-[600px] md:h-[750px] max-h-[95vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row ring-1 ring-gray-200"
+      {/* Modal Container */}
+      <div 
+        className="relative bg-white w-full max-w-6xl h-[600px] md:h-[750px] max-h-[95vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row ring-1 ring-gray-200 animate-[fadeIn_0.2s_ease-out]"
+      >
+        {/* Close Button (Mobile) */}
+        <button 
+           onClick={onClose}
+           className="md:hidden absolute top-4 right-4 z-20 p-2 bg-gray-100 rounded-full text-gray-500 hover:text-gray-900"
         >
-          {/* Close Button (Mobile) */}
-          <button 
-             onClick={onClose}
-             className="md:hidden absolute top-4 right-4 z-20 p-2 bg-gray-100 rounded-full text-gray-500 hover:text-gray-900"
-          >
-             <X size={20} />
-          </button>
+           <X size={20} />
+        </button>
 
-          {/* Sidebar Navigation */}
-          <aside className="w-full md:w-80 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col shrink-0">
-             <div className="p-4 md:p-6 border-b border-gray-100/50">
-                <div className="flex items-center gap-2">
-                    <div className="bg-brand-600 p-2 rounded-lg text-white shadow-lg shadow-brand-500/20">
-                    <Calculator size={20} />
-                    </div>
-                    <span className="font-bold text-lg text-gray-900 tracking-tight">FoodSnap Tools</span>
-                </div>
-             </div>
+        {/* Sidebar Navigation */}
+        <aside className="w-full md:w-80 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col shrink-0">
+           <div className="p-4 md:p-6 border-b border-gray-100/50">
+              <div className="flex items-center gap-2">
+                  <div className="bg-brand-600 p-2 rounded-lg text-white shadow-lg shadow-brand-500/20">
+                  <Calculator size={20} />
+                  </div>
+                  <span className="font-bold text-lg text-gray-900 tracking-tight">FoodSnap Tools</span>
+              </div>
+           </div>
 
-             <nav className="flex-1 overflow-y-auto p-4 md:p-4 space-y-1 scrollbar-thin scrollbar-thumb-gray-200 flex flex-row md:flex-col gap-2 md:gap-1 overflow-x-auto md:overflow-x-visible pb-4 md:pb-0">
-                <NavButton 
-                  active={activeTool === 'bmi'} 
-                  onClick={() => setActiveTool('bmi')} 
-                  icon={<Scale size={18} />}
-                  label={t.tools.bmi.title}
-                  desc="Índice de Massa Corporal"
-                />
-                <NavButton 
-                  active={activeTool === 'tdee'} 
-                  onClick={() => setActiveTool('tdee')} 
-                  icon={<Flame size={18} />}
-                  label={t.tools.tdee.title}
-                  desc="Gasto Total Diário"
-                />
-                <NavButton 
-                  active={activeTool === 'water'} 
-                  onClick={() => setActiveTool('water')} 
-                  icon={<Droplets size={18} />}
-                  label={t.tools.water.title}
-                  desc="Hidratação Diária"
-                />
-                 <NavButton 
-                  active={activeTool === 'bmr'} 
-                  onClick={() => setActiveTool('bmr')} 
-                  icon={<Activity size={18} />}
-                  label={t.tools.bmr.title}
-                  desc="Taxa Metabólica Basal"
-                />
-                <div className="hidden md:block h-px bg-gray-200 my-2 mx-4"></div>
-                <NavButton 
-                  active={activeTool === 'orm'} 
-                  onClick={() => setActiveTool('orm')} 
-                  icon={<Dumbbell size={18} />}
-                  label={t.tools.orm.title}
-                  desc="Força Máxima (1RM)"
-                />
-                <NavButton 
-                  active={activeTool === 'bodyfat'} 
-                  onClick={() => setActiveTool('bodyfat')} 
-                  icon={<Percent size={18} />}
-                  label={t.tools.bodyfat.title}
-                  desc="Gordura Corporal"
-                />
-                <NavButton 
-                  active={activeTool === 'hr'} 
-                  onClick={() => setActiveTool('hr')} 
-                  icon={<Heart size={18} />}
-                  label={t.tools.hr.title}
-                  desc="Zonas Cardíacas"
-                />
-             </nav>
-          </aside>
+           <nav className="flex-1 overflow-y-auto p-4 md:p-4 space-y-1 scrollbar-thin scrollbar-thumb-gray-200 flex flex-row md:flex-col gap-2 md:gap-1 overflow-x-auto md:overflow-x-visible pb-4 md:pb-0">
+              <NavButton 
+                active={activeTool === 'bmi'} 
+                onClick={() => setActiveTool('bmi')} 
+                icon={<Scale size={18} />}
+                label={t.tools.bmi.title}
+                desc="Índice de Massa Corporal"
+              />
+              <NavButton 
+                active={activeTool === 'tdee'} 
+                onClick={() => setActiveTool('tdee')} 
+                icon={<Flame size={18} />}
+                label={t.tools.tdee.title}
+                desc="Gasto Total Diário"
+              />
+              <NavButton 
+                active={activeTool === 'water'} 
+                onClick={() => setActiveTool('water')} 
+                icon={<Droplets size={18} />}
+                label={t.tools.water.title}
+                desc="Hidratação Diária"
+              />
+               <NavButton 
+                active={activeTool === 'bmr'} 
+                onClick={() => setActiveTool('bmr')} 
+                icon={<Activity size={18} />}
+                label={t.tools.bmr.title}
+                desc="Taxa Metabólica Basal"
+              />
+              <div className="hidden md:block h-px bg-gray-200 my-2 mx-4"></div>
+              <NavButton 
+                active={activeTool === 'orm'} 
+                onClick={() => setActiveTool('orm')} 
+                icon={<Dumbbell size={18} />}
+                label={t.tools.orm.title}
+                desc="Força Máxima (1RM)"
+              />
+              <NavButton 
+                active={activeTool === 'bodyfat'} 
+                onClick={() => setActiveTool('bodyfat')} 
+                icon={<Percent size={18} />}
+                label={t.tools.bodyfat.title}
+                desc="Gordura Corporal"
+              />
+              <NavButton 
+                active={activeTool === 'hr'} 
+                onClick={() => setActiveTool('hr')} 
+                icon={<Heart size={18} />}
+                label={t.tools.hr.title}
+                desc="Zonas Cardíacas"
+              />
+           </nav>
+        </aside>
 
-          {/* Main Content Area */}
-          <main className="flex-1 relative overflow-y-auto bg-white">
-             {/* Close Button (Desktop) */}
-             <button 
-                onClick={onClose}
-                className="hidden md:block absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 transition-colors bg-white hover:bg-gray-100 rounded-full z-10"
-             >
-                <X size={24} />
-             </button>
+        {/* Main Content Area */}
+        <main className="flex-1 relative overflow-y-auto bg-white">
+           <button 
+              onClick={onClose}
+              className="hidden md:block absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 transition-colors bg-white hover:bg-gray-100 rounded-full z-10"
+           >
+              <X size={24} />
+           </button>
 
-             <div className="p-6 md:p-10 max-w-3xl mx-auto h-full flex flex-col justify-center min-h-[500px]">
-                <AnimatePresence mode="wait">
-                   <motion.div
-                     key={activeTool}
-                     initial={{ opacity: 0, x: 20 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     exit={{ opacity: 0, x: -20 }}
-                     transition={{ duration: 0.3 }}
-                     className="w-full"
-                   >
-                      {activeTool === 'bmi' && <BMICalculator t={t} />}
-                      {activeTool === 'water' && <WaterCalculator t={t} />}
-                      {activeTool === 'bmr' && <BMRCalculator t={t} />}
-                      {activeTool === 'tdee' && <TDEECalculator t={t} />}
-                      {activeTool === 'orm' && <ORMCalculator t={t} />}
-                      {activeTool === 'bodyfat' && <BodyFatCalculator t={t} />}
-                      {activeTool === 'hr' && <HeartRateCalculator t={t} />}
-                   </motion.div>
-                </AnimatePresence>
-             </div>
-          </main>
-        </motion.div>
+           <div className="p-6 md:p-10 max-w-3xl mx-auto h-full flex flex-col justify-center min-h-[500px]">
+              <div className="w-full animate-[fadeIn_0.3s_ease-out]">
+                  {activeTool === 'bmi' && <BMICalculator t={t} />}
+                  {activeTool === 'water' && <WaterCalculator t={t} />}
+                  {activeTool === 'bmr' && <BMRCalculator t={t} />}
+                  {activeTool === 'tdee' && <TDEECalculator t={t} />}
+                  {activeTool === 'orm' && <ORMCalculator t={t} />}
+                  {activeTool === 'bodyfat' && <BodyFatCalculator t={t} />}
+                  {activeTool === 'hr' && <HeartRateCalculator t={t} />}
+              </div>
+           </div>
+        </main>
       </div>
-    </AnimatePresence>
+    </div>
   );
 };
-
-// --- Components de Navegação ---
 
 const NavButton = ({ active, onClick, icon, label, desc }: any) => (
   <button
@@ -166,8 +145,6 @@ const NavButton = ({ active, onClick, icon, label, desc }: any) => (
     {active && <div className="hidden md:block ml-auto w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0"></div>}
   </button>
 );
-
-// --- Calculadoras (Existentes + Novas) ---
 
 const BMICalculator = ({ t }: any) => {
     const [weight, setWeight] = useState('');
@@ -212,7 +189,7 @@ const BMICalculator = ({ t }: any) => {
             </button>
 
             {bmi && status && (
-                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 animate-in fade-in slide-in-from-bottom-4">
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 animate-[fadeIn_0.5s_ease-out]">
                    <div className="text-center mb-6">
                       <p className="text-sm text-gray-500 font-medium uppercase tracking-wide mb-1">Seu Resultado</p>
                       <div className="text-5xl font-extrabold text-gray-900 mb-2">{bmi}</div>
@@ -350,7 +327,7 @@ const BMRCalculator = ({ t }: any) => {
             </button>
 
             {bmr && (
-                <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in">
+                <div className="bg-orange-50 border border-orange-100 p-6 rounded-2xl flex items-center justify-between animate-[fadeIn_0.5s_ease-out]">
                     <div>
                         <p className="text-sm text-orange-800 font-medium uppercase tracking-wide mb-1">Gasto em Repouso</p>
                         <p className="text-xs text-orange-600/70 max-w-[200px]">Calorias que você queima parado.</p>
@@ -432,7 +409,7 @@ const TDEECalculator = ({ t }: any) => {
             </button>
 
             {tdee && (
-                <div className="bg-brand-900 text-white p-6 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in shadow-xl">
+                <div className="bg-brand-900 text-white p-6 rounded-2xl flex items-center justify-between animate-[fadeIn_0.5s_ease-out] shadow-xl">
                     <div>
                         <p className="text-sm text-brand-300 font-bold uppercase tracking-wide mb-1">Gasto Calórico Total</p>
                         <p className="text-xs text-brand-200 opacity-80 max-w-[200px]">Energia necessária para manter seu peso atual.</p>
@@ -487,7 +464,7 @@ const ORMCalculator = ({ t }: any) => {
             </button>
 
             {orm && (
-                <div className="bg-gray-100 p-6 rounded-2xl animate-in fade-in slide-in-from-bottom-2">
+                <div className="bg-gray-100 p-6 rounded-2xl animate-[fadeIn_0.5s_ease-out]">
                    <div className="flex justify-between items-center mb-4">
                       <span className="text-gray-500 font-bold uppercase text-xs">Sua Força Máxima Estimada</span>
                       <Dumbbell className="text-gray-400" size={20} />
@@ -570,7 +547,7 @@ const BodyFatCalculator = ({ t }: any) => {
             </button>
 
             {bf && (
-                <div className="bg-brand-50 border border-brand-100 p-8 rounded-2xl text-center animate-in fade-in zoom-in">
+                <div className="bg-brand-50 border border-brand-100 p-8 rounded-2xl text-center animate-[fadeIn_0.5s_ease-out]">
                     <p className="text-sm text-brand-800 font-bold uppercase tracking-wide mb-2">Gordura Corporal Estimada</p>
                     <p className="text-6xl font-black text-brand-600">{bf}<span className="text-3xl">%</span></p>
                     <div className="mt-4 text-xs text-brand-500 font-medium bg-brand-100 inline-block px-3 py-1 rounded-full">
@@ -609,7 +586,7 @@ const HeartRateCalculator = ({ t }: any) => {
             </button>
 
             {maxHr && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-4 animate-[fadeIn_0.5s_ease-out]">
                     <div className="text-center mb-6">
                         <span className="text-sm font-bold text-gray-400 uppercase">Frequência Máxima Teórica</span>
                         <div className="text-5xl font-black text-gray-900">{maxHr} <span className="text-xl font-medium text-gray-400">bpm</span></div>

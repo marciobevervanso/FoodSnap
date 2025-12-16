@@ -21,7 +21,7 @@ const Pricing: React.FC<PricingProps> = ({ onRegister }) => {
         </div>
 
         {/* Free Plan Banner */}
-        <div className="max-w-xl mx-auto mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-xl mx-auto mb-16">
            <div className="bg-brand-50 border border-brand-100 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left shadow-sm">
               <div className="flex items-center gap-4">
                   <div className="bg-brand-100 p-3 rounded-xl text-brand-600">
@@ -43,7 +43,7 @@ const Pricing: React.FC<PricingProps> = ({ onRegister }) => {
 
         <div className="grid lg:grid-cols-3 gap-6 max-w-6xl mx-auto items-start">
           
-          {/* Plan: Monthly (Was Starter in structure, now Monthly) */}
+          {/* Plan: Monthly */}
           <div className="bg-white rounded-3xl border border-gray-200 p-8 flex flex-col hover:border-gray-300 transition-colors lg:mt-8 hover:shadow-lg">
             <h3 className="text-lg font-bold text-gray-900">{t.pricing.plans.monthly.title}</h3>
             <div className="mt-4 mb-2 flex items-baseline gap-1">
@@ -70,9 +70,8 @@ const Pricing: React.FC<PricingProps> = ({ onRegister }) => {
             </button>
           </div>
 
-          {/* Plan: Annual (Highlighted) */}
+          {/* Plan: Annual */}
           <div className="bg-brand-950 rounded-3xl border border-brand-800 p-8 flex flex-col relative shadow-2xl shadow-brand-900/20 transform lg:scale-105 z-10 ring-1 ring-brand-700/50">
-            {/* Badge Highlight */}
             <div className="absolute top-0 inset-x-0 -translate-y-1/2 flex justify-center">
                 <div className="bg-gradient-to-r from-accent-500 to-brand-400 text-brand-950 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide border-2 border-brand-950 shadow-lg flex items-center gap-1.5">
                    <Star size={12} fill="currentColor" />
@@ -150,7 +149,7 @@ const Pricing: React.FC<PricingProps> = ({ onRegister }) => {
 
         </div>
 
-        <div className="mt-16 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+        <div className="mt-16 flex justify-center">
             <div className="inline-flex items-center gap-2 text-gray-500 text-sm bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
                 <ShieldCheck size={16} className="text-brand-500" />
                 <p>{t.pricing.secure}</p>

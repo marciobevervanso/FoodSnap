@@ -19,7 +19,7 @@ import {
   QrCode,
   CheckCircle2
 } from 'lucide-react';
-import { User } from '../types'; // Importação corrigida
+import { User } from '../types'; 
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -272,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
         </div>
 
         {activeTab === 'overview' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
+          <div className="max-w-5xl mx-auto">
              <header className="mb-8">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t.dashboard.hello}, {user.name.split(' ')[0]}! 👋</h1>
                 <p className="text-gray-500 flex items-center gap-2">
@@ -381,7 +381,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
         )}
 
         {activeTab === 'history' && (
-             <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="max-w-5xl mx-auto">
                 <header className="mb-8">
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t.dashboard.historyTitle}</h1>
                     <p className="text-gray-500">{t.dashboard.historySubtitle}</p>
@@ -447,7 +447,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
         )}
 
         {activeTab === 'subscription' && (
-            <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="max-w-3xl mx-auto">
                  <header className="mb-8">
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t.dashboard.subTitle}</h1>
                     <p className="text-gray-500">{t.dashboard.subDesc}</p>

@@ -70,7 +70,6 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check active session on load
   useEffect(() => {
     let mounted = true;
 
@@ -103,7 +102,6 @@ const AppContent: React.FC = () => {
         if (session?.user) {
            if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
-           // Se estiver na raiz e logar, vai pro dashboard
            if (location.pathname === '/' || location.pathname === '') {
                navigate('/dashboard');
            }
@@ -115,7 +113,7 @@ const AppContent: React.FC = () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []); // Remove navigate from deps to avoid loops
+  }, []);
 
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
@@ -225,9 +223,6 @@ const AppContent: React.FC = () => {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
-             <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/30 rounded-full blur-3xl"></div>
-             <div className="absolute top-40 -left-20 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl"></div>
-
              <RegistrationModal 
                 isOpen={true} 
                 onClose={() => {}} 
@@ -236,7 +231,6 @@ const AppContent: React.FC = () => {
                 isCompletingProfile={true}
                 onSuccess={handleAuthSuccess}
              />
-             
              <div className="absolute bottom-8 left-0 right-0 text-center">
                 <button 
                   onClick={handleLogout}
@@ -249,11 +243,12 @@ const AppContent: React.FC = () => {
       );
   }
 
+  const isInternalPage = location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900 flex flex-col">
       
-      {/* Exibe Header apenas nas rotas públicas ou se usuário não estiver logado */}
-      {!location.pathname.includes('/dashboard') && !location.pathname.includes('/admin') && (
+      {!isInternalPage && (
           <Header 
             onRegister={() => handleOpenRegister('starter')} 
             onLogin={handleOpenLogin}
@@ -262,7 +257,7 @@ const AppContent: React.FC = () => {
           />
       )}
       
-      <main className="flex-grow">
+      <main className="flex-grow flex flex-col w-full">
         <Routes>
             <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
             
@@ -288,12 +283,12 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
             } />
             
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Catch-all garantido */}
+            <Route path="*" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
         </Routes>
       </main>
 
-      {/* Footer só aparece na Home */}
-      {location.pathname === '/' && (
+      {!isInternalPage && (
           <Footer onRegister={() => handleOpenRegister('starter')} />
       )}
       
@@ -313,7 +308,7 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Alterado para HashRouter para evitar problemas de 404 em hospedagem estática e conflitos
+// Usando HashRouter para máxima compatibilidade
 const App: React.FC = () => {
   return (
     <HashRouter>

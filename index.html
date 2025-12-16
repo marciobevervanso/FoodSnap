@@ -8,25 +8,7 @@
     <!-- SEO Principal -->
     <title>FoodSnap.ai - Seu Nutricionista de Bolso com IA</title>
     <meta name="description" content="Transforme seu corpo com apenas uma foto. Inteligência Artificial que calcula calorias, macros e dá dicas nutricionais pelo WhatsApp. Sem planilhas, sem estresse." />
-    <meta name="keywords" content="nutrição ia, contador calorias foto, dieta whatsapp, inteligência artificial nutrição, emagrecimento, foodsnap" />
-    <meta name="author" content="FoodSnap.ai" />
-    <meta name="theme-color" content="#064e3b" />
-
-    <!-- Open Graph / Facebook / WhatsApp (Deixa o link bonito) -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://foodsnap.ai/" />
-    <meta property="og:title" content="FoodSnap.ai - Seu Nutricionista de Bolso" />
-    <meta property="og:description" content="Tire uma foto do prato e receba análise completa de calorias e macros em segundos. Teste grátis agora!" />
-    <meta property="og:image" content="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=630&q=80" />
-    <meta property="og:locale" content="pt_BR" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://foodsnap.ai/" />
-    <meta property="twitter:title" content="FoodSnap.ai - Nutrição com IA" />
-    <meta property="twitter:description" content="Adeus planilhas. Controle sua dieta apenas tirando fotos da sua comida. Simples, rápido e via WhatsApp." />
-    <meta property="twitter:image" content="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=630&q=80" />
-
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -35,66 +17,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Configurações de Tema e Tratamento de Erros -->
+    <!-- Configurações de Tema -->
     <script>
-      // Define ambiente de produção para otimizar React
       window.process = { env: { NODE_ENV: 'production' } };
-
-      // Configuração Tailwind
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
             colors: {
-              gray: {
-                50: '#f9fafb',
-                100: '#f3f4f6',
-                200: '#e5e7eb',
-                300: '#d1d5db',
-                400: '#9ca3af',
-                500: '#6b7280',
-                600: '#4b5563',
-                700: '#374151',
-                800: '#1f2937',
-                850: '#111827',
-                900: '#030712', // Darker base
-              },
               brand: {
-                50: '#ecfdf5',
-                100: '#d1fae5',
-                200: '#a7f3d0',
-                300: '#6ee7b7',
-                400: '#34d399',
-                500: '#10b981',
-                600: '#059669',
-                700: '#047857',
-                800: '#065f46',
-                900: '#064e3b',
-                950: '#022c22',
+                50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+                400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857',
+                800: '#065f46', 900: '#064e3b', 950: '#022c22',
               },
-              accent: {
-                400: '#a3e635',
-                500: '#84cc16',
-                600: '#65a30d',
-              }
-            },
-            boxShadow: {
-              'glow': '0 0 40px rgba(16, 185, 129, 0.15)',
-              'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+              accent: { 400: '#a3e635', 500: '#84cc16', 600: '#65a30d' }
             }
           }
         }
       }
-
-      window.onerror = function(msg, url, line, col, error) {
-        if (msg.includes('ResizeObserver')) return;
-        console.error("Critical Error:", msg, error);
-      };
     </script>
     
-    <!-- Import Map OTIMIZADO PARA ESTABILIDADE (React 18) -->
+    <!-- Import Map: Sem Framer Motion para estabilidade total -->
     <script type="importmap">
     {
       "imports": {
@@ -103,13 +46,11 @@
         "react-dom": "https://esm.sh/react-dom@18.2.0",
         "react-dom/": "https://esm.sh/react-dom@18.2.0/",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
         "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?deps=react@18.2.0,react-dom@18.2.0",
         "@remix-run/router": "https://esm.sh/@remix-run/router@1.15.3",
         "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0,react-dom@18.2.0",
-        "framer-motion": "https://esm.sh/framer-motion@11.0.8?deps=react@18.2.0,react-dom@18.2.0",
         "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.8",
-        "@google/genai": "https://esm.sh/@google/genai"
+        "@google/genai": "https://esm.sh/@google/genai@0.1.1"
       }
     }
     </script>

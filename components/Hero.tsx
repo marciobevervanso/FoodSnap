@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowRight, MessageCircle, Scan, Zap, Camera, Lightbulb, Sparkles, Upload, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Scan, Zap, Camera, Lightbulb, Sparkles, Upload, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface HeroProps {
@@ -64,13 +63,8 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           
-          {/* Text Content */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex-1 text-center lg:text-left"
-          >
+          {/* Text Content - Trocado motion.div por div normal para garantir visibilidade */}
+          <div className="flex-1 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm text-gray-600 text-xs font-bold uppercase tracking-wider mb-8 ring-1 ring-gray-50">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
@@ -133,16 +127,11 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
                   <span>{t.hero.analysis}</span>
                </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Visual Element - Modern Mockup Interactive */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="flex-1 relative w-full max-w-md lg:max-w-full flex justify-center lg:justify-end"
-          >
-            <div className="relative z-10 w-[340px] bg-gray-950 rounded-[45px] border-[8px] border-gray-950 shadow-2xl overflow-hidden ring-1 ring-white/10 transform transition-transform duration-500">
+          {/* Visual Element - Trocado motion.div por div normal */}
+          <div className="flex-1 relative w-full max-w-md lg:max-w-full flex justify-center lg:justify-end mt-12 lg:mt-0">
+            <div className="relative z-10 w-[340px] bg-gray-950 rounded-[45px] border-[8px] border-gray-950 shadow-2xl overflow-hidden ring-1 ring-white/10">
                 {/* Notch */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 h-7 w-36 bg-gray-950 rounded-b-2xl z-20"></div>
                 
@@ -167,32 +156,38 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
                     {/* Chat Area */}
                     <div className="flex-1 p-4 flex flex-col gap-5 overflow-hidden bg-[#f1f5f9] relative">
                          {/* User Message (Image) */}
-                         <AnimatePresence>
-                             <motion.div 
-                                key={userImage || 'default-img'}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="self-end max-w-[85%] flex flex-col items-end"
-                             >
+                         <div className={`self-end max-w-[85%] flex flex-col items-end transition-all duration-300 ${userImage ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 absolute'}`}>
+                            {userImage && (
+                                <>
+                                    <div className="bg-brand-600 p-1 rounded-2xl rounded-tr-sm shadow-md mb-1 ring-1 ring-brand-700/10">
+                                        <img 
+                                            src={userImage} 
+                                            className="rounded-xl w-full h-32 object-cover" 
+                                            alt="Meal" 
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 font-medium mr-1">12:30</p>
+                                </>
+                            )}
+                         </div>
+
+                         {/* Fallback default image for demo look */}
+                         {!userImage && (
+                            <div className="self-end max-w-[85%] flex flex-col items-end">
                                 <div className="bg-brand-600 p-1 rounded-2xl rounded-tr-sm shadow-md mb-1 ring-1 ring-brand-700/10">
                                     <img 
-                                        src={userImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"} 
+                                        src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80" 
                                         className="rounded-xl w-full h-32 object-cover" 
                                         alt="Meal" 
                                     />
                                 </div>
                                 <p className="text-[10px] text-gray-400 font-medium mr-1">12:30</p>
-                             </motion.div>
-                         </AnimatePresence>
+                            </div>
+                         )}
                          
                          {/* Loading State / Robot Message */}
                          {demoState === 'analyzing' && (
-                             <motion.div 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="self-start max-w-[85%]"
-                             >
+                             <div className="self-start max-w-[85%] animate-pulse">
                                  <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-200 flex flex-col gap-2">
                                      <div className="flex items-center gap-2">
                                          <div className="flex gap-1.5">
@@ -203,17 +198,12 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
                                          <span className="text-xs font-semibold text-gray-500">{t.hero.demoProcessing}</span>
                                      </div>
                                  </div>
-                             </motion.div>
+                             </div>
                          )}
 
                          {/* AI Response */}
                          {(demoState === 'initial' || demoState === 'result') && (
-                             <motion.div 
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                                className="self-start max-w-[95%]"
-                             >
+                             <div className="self-start max-w-[95%]">
                                 <div className="bg-white p-4 rounded-2xl rounded-tl-sm shadow-md border border-gray-200">
                                     {/* Header Analysis */}
                                     <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
@@ -271,7 +261,7 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
                                     <Sparkles size={10} className="text-brand-500" />
                                     <p className="text-[9px] text-gray-400">Powered by FoodSnap</p>
                                 </div>
-                             </motion.div>
+                             </div>
                          )}
                     </div>
 
@@ -289,70 +279,47 @@ const Hero: React.FC<HeroProps> = ({ onRegister }) => {
                     </div>
                 </div>
             </div>
-            
-            {/* Floating Elements */}
-            {demoState === 'initial' && (
-                <div className="absolute top-[20%] -left-4 lg:-left-12 bg-white p-3 rounded-xl shadow-xl border border-gray-100 animate-bounce delay-1000 hidden md:block z-20">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-brand-50 p-1.5 rounded-lg text-brand-700 border border-brand-100">
-                            <Scan size={16} />
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase">Detected</p>
-                            <p className="text-xs font-bold text-gray-800">Salmon Bowl</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-          </motion.div>
+          </div>
 
         </div>
       </div>
 
       {/* Demo Instruction Modal */}
-      <AnimatePresence>
-        {showDemoInstruction && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-             <motion.div 
-               initial={{ opacity: 0 }} 
-               animate={{ opacity: 1 }} 
-               exit={{ opacity: 0 }}
-               onClick={() => setShowDemoInstruction(false)}
-               className="absolute inset-0 bg-gray-950/70 backdrop-blur-sm"
-             />
-             <motion.div 
-               initial={{ opacity: 0, scale: 0.9, y: 20 }} 
-               animate={{ opacity: 1, scale: 1, y: 0 }} 
-               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-               className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 text-center"
-             >
-                <button 
-                  onClick={() => setShowDemoInstruction(false)}
-                  className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X size={20} />
-                </button>
+      {showDemoInstruction && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div 
+              onClick={() => setShowDemoInstruction(false)}
+              className="absolute inset-0 bg-gray-950/70 backdrop-blur-sm"
+            />
+            <div 
+              className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 text-center animate-in fade-in zoom-in-95 duration-200"
+            >
+              <button 
+                onClick={() => setShowDemoInstruction(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
 
-                <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                   <Camera size={32} className="text-brand-600" />
-                </div>
+              <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Camera size={32} className="text-brand-600" />
+              </div>
 
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">{t.hero.demoModalTitle}</h3>
-                <p className="text-gray-600 mb-8 leading-relaxed">
-                   {t.hero.demoModalDesc}
-                </p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">{t.hero.demoModalTitle}</h3>
+              <p className="text-gray-600 mb-8 leading-relaxed">
+                  {t.hero.demoModalDesc}
+              </p>
 
-                <button 
-                   onClick={handleTriggerUpload}
-                   className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
-                >
-                   <Upload size={20} />
-                   {t.hero.demoModalBtn}
-                </button>
-             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              <button 
+                  onClick={handleTriggerUpload}
+                  className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+              >
+                  <Upload size={20} />
+                  {t.hero.demoModalBtn}
+              </button>
+            </div>
+        </div>
+      )}
     </section>
   );
 };

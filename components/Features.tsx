@@ -1,6 +1,5 @@
 import React from 'react';
 import { Flame, Scale, MessageSquare, Sparkles, ArrowLeftRight, UtensilsCrossed, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const Features: React.FC = () => {
@@ -45,12 +44,7 @@ const Features: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-20 items-start">
           
           <div className="lg:w-1/2 lg:sticky lg:top-24 order-2 lg:order-1 pt-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.6 }}
-            >
+            <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs font-bold uppercase tracking-wider mb-6">
                 <Sparkles size={12} />
                 {t.features.guruTitle}
@@ -61,16 +55,12 @@ const Features: React.FC = () => {
               <p className="text-lg text-gray-600 mb-10 leading-relaxed font-light">
                 {t.features.subtitle}
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-1 gap-6">
               {features.map((feature, index) => (
-                <motion.div 
+                <div 
                   key={index} 
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
                   className="group flex gap-5 items-start"
                 >
                   <div className={`shrink-0 p-3.5 rounded-2xl border shadow-sm group-hover:shadow-md transition-all duration-300 ${feature.bg}`}>
@@ -80,18 +70,12 @@ const Features: React.FC = () => {
                     <h3 className="font-bold text-gray-900 text-lg mb-1">{feature.title}</h3>
                     <p className="text-gray-500 text-sm leading-relaxed">{feature.description}</p>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, x: 20 }}
-            whileInView={{ opacity: 1, scale: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="lg:w-1/2 w-full order-1 lg:order-2 flex justify-center"
-          >
+          <div className="lg:w-1/2 w-full order-1 lg:order-2 flex justify-center">
              <div className="relative w-full max-w-lg aspect-[4/5] sm:aspect-square">
                 
                 {/* Abstract Background Blob */}
@@ -182,7 +166,7 @@ const Features: React.FC = () => {
                 </div>
 
              </div>
-          </motion.div>
+          </div>
 
         </div>
       </div>
