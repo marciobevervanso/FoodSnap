@@ -1,117 +1,109 @@
 import React from 'react';
 import { Scan, Zap, MessageCircle, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 interface FooterProps {
   onRegister: () => void;
-  onNavigate?: (view: 'home' | 'faq') => void; // Optional prop to support navigation
+  onNavigate?: (view: 'home' | 'faq') => void;
 }
 
-const Footer: React.FC<FooterProps> = ({ onRegister, onNavigate }) => {
+const Footer: React.FC<FooterProps> = ({ onRegister }) => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const handleFaqClick = (e: React.MouseEvent) => {
-    if (onNavigate) {
-      e.preventDefault();
-      onNavigate('faq');
-    }
+    e.preventDefault();
+    navigate('/faq');
+    window.scrollTo(0, 0);
   };
 
-  const handleHomeClick = (e: React.MouseEvent, id?: string) => {
-     if (onNavigate) {
-         // Se tiver navegação, garante que estamos na home primeiro
-         if (!id) {
-             e.preventDefault();
-             onNavigate('home');
-         }
-     }
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <footer className="bg-gray-950 text-gray-400 border-t border-gray-900">
-      {/* Final CTA */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-brand-900/40 via-gray-950 to-gray-950"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 tracking-tight">
-                {t.footer.ctaTitle}
-            </h2>
-            <p className="text-gray-400 text-lg mb-8 max-w-2xl mx-auto font-light">
-                {t.footer.ctaDesc}
-            </p>
-            <button 
-                onClick={onRegister}
-                className="inline-flex items-center gap-2 bg-brand-600 text-white hover:bg-brand-500 px-8 py-4 rounded-full text-lg font-bold transition-all hover:scale-105 shadow-xl shadow-brand-900/50 hover:shadow-brand-500/20"
-            >
-                <MessageCircle size={20} />
-                {t.footer.ctaBtn}
-            </button>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8 border-t border-gray-900">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-          <div className="col-span-1 md:col-span-1">
-            <div className="flex items-center gap-3 mb-6 cursor-pointer" onClick={(e) => handleHomeClick(e)}>
-              <div className="relative flex items-center justify-center w-10 h-10 bg-gray-900 rounded-xl border border-gray-800">
-                 <Scan size={20} className="text-brand-500" strokeWidth={1.5} />
-                 <Zap size={10} className="absolute text-yellow-500 fill-yellow-500" />
+    <footer className="bg-gray-900 text-white pt-20 pb-10 border-t border-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+          
+          {/* Brand Column */}
+          <div className="space-y-6">
+            <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 group w-fit">
+              <div className="relative flex items-center justify-center w-10 h-10 bg-gray-800 rounded-xl border border-gray-700 group-hover:border-brand-500 transition-colors">
+                <Scan size={20} className="text-gray-400 group-hover:text-brand-400 transition-colors" />
+                <Zap size={10} className="absolute text-yellow-500 fill-yellow-500 -rotate-12 translate-y-0.5 translate-x-0.5" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-white">FoodSnap.ai</span>
-            </div>
-            <p className="text-sm text-gray-500 leading-relaxed">
+              <span className="text-xl font-bold tracking-tight text-white">
+                FoodSnap<span className="text-brand-500">.ai</span>
+              </span>
+            </a>
+            <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
               {t.footer.desc}
             </p>
+            <div className="flex gap-4">
+              <SocialButton icon={<Instagram size={18} />} />
+              <SocialButton icon={<Twitter size={18} />} />
+              <SocialButton icon={<Linkedin size={18} />} />
+            </div>
           </div>
 
+          {/* Links Column 1 */}
           <div>
-            <h3 className="text-white font-semibold mb-6 text-sm uppercase tracking-wider">{t.footer.platform}</h3>
-            <ul className="space-y-3 text-sm">
-              <li><a href="#how-it-works" onClick={(e) => handleHomeClick(e, 'how-it-works')} className="hover:text-brand-400 transition-colors">{t.header.howItWorks}</a></li>
-              <li><a href="#features" onClick={(e) => handleHomeClick(e, 'features')} className="hover:text-brand-400 transition-colors">{t.header.features}</a></li>
-              <li><a href="#pricing" onClick={(e) => handleHomeClick(e, 'pricing')} className="hover:text-brand-400 transition-colors">{t.header.pricing}</a></li>
-              <li>
-                  <button onClick={handleFaqClick} className="hover:text-brand-400 transition-colors text-left">
-                      FAQ / Ajuda
-                  </button>
-              </li>
+            <h4 className="font-bold text-white mb-6">{t.footer.platform}</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
+              <li><a href="#how-it-works" className="hover:text-brand-400 transition-colors">Como Funciona</a></li>
+              <li><a href="#features" className="hover:text-brand-400 transition-colors">Funcionalidades</a></li>
+              <li><a href="#pricing" className="hover:text-brand-400 transition-colors">Planos & Preços</a></li>
+              <li><button onClick={handleFaqClick} className="hover:text-brand-400 transition-colors">Central de Ajuda</button></li>
             </ul>
           </div>
 
+          {/* Links Column 2 */}
           <div>
-            <h3 className="text-white font-semibold mb-6 text-sm uppercase tracking-wider">{t.footer.legal}</h3>
-            <ul className="space-y-3 text-sm">
+            <h4 className="font-bold text-white mb-6">{t.footer.legal}</h4>
+            <ul className="space-y-4 text-sm text-gray-400">
               <li><a href="#" className="hover:text-brand-400 transition-colors">Termos de Uso</a></li>
               <li><a href="#" className="hover:text-brand-400 transition-colors">Privacidade</a></li>
-              <li><a href="#" className="hover:text-brand-400 transition-colors">Disclaimer</a></li>
+              <li><a href="#" className="hover:text-brand-400 transition-colors">Cookies</a></li>
             </ul>
           </div>
 
-          <div>
-             <h3 className="text-white font-semibold mb-6 text-sm uppercase tracking-wider">{t.footer.connect}</h3>
-             <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-900 border border-gray-800 hover:border-brand-600 hover:bg-brand-600 hover:text-white transition-all duration-300 text-gray-400">
-                    <Instagram size={18} />
-                </a>
-                <a href="#" className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-900 border border-gray-800 hover:border-brand-600 hover:bg-brand-600 hover:text-white transition-all duration-300 text-gray-400">
-                    <Twitter size={18} />
-                </a>
-                 <a href="#" className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-900 border border-gray-800 hover:border-brand-600 hover:bg-brand-600 hover:text-white transition-all duration-300 text-gray-400">
-                    <Linkedin size={18} />
-                </a>
+          {/* CTA Column */}
+          <div className="lg:col-span-1">
+             <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                <h4 className="font-bold text-white mb-2">{t.footer.ctaTitle}</h4>
+                <p className="text-gray-400 text-xs mb-4">{t.footer.ctaDesc}</p>
+                <button 
+                  onClick={onRegister}
+                  className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={16} />
+                  {t.footer.ctaBtn}
+                </button>
              </div>
           </div>
         </div>
 
-        <div className="border-t border-gray-900 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-600">
-          <p>&copy; {new Date().getFullYear()} FoodSnap.ai. {t.footer.rights}</p>
-          <div className="flex gap-6">
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div> System Operational</span>
+        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-gray-500 text-sm">
+            © {new Date().getFullYear()} FoodSnap AI. {t.footer.rights}
+          </p>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+             System Operational
           </div>
         </div>
       </div>
     </footer>
   );
 };
+
+const SocialButton = ({ icon }: { icon: React.ReactNode }) => (
+  <a href="#" className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-brand-600 hover:text-white transition-all border border-gray-700 hover:border-brand-500">
+    {icon}
+  </a>
+);
 
 export default Footer;

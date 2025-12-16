@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, PropsWithChildren } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -15,19 +16,59 @@ import FAQPage from './components/FAQPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
 import { Loader2, LogOut } from 'lucide-react';
-import { User } from './types'; // Importação corrigida
+import { User } from './types';
+
+// Componente Wrapper para proteger rotas privadas
+interface ProtectedRouteProps {
+  user: User | null;
+  isLoading: boolean;
+  requiredAdmin?: boolean;
+}
+
+const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ children, user, isLoading, requiredAdmin = false }) => {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requiredAdmin && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Componente da Home Page (Landing)
+const HomePage = ({ onRegister, onOpenTools }: { onRegister: (plan: string) => void, onOpenTools: () => void }) => (
+  <div className="flex flex-col min-h-screen">
+    <Hero onRegister={() => onRegister('starter')} />
+    <HowItWorks />
+    <Features />
+    <Testimonials />
+    <Pricing onRegister={onRegister} />
+    <FAQ />
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [selectedPlan, setSelectedPlan] = useState('starter');
-  const [currentView, setCurrentView] = useState<'home' | 'faq'>('home'); 
   
   const [user, setUser] = useState<User | null>(null);
-  const [isAdminView, setIsAdminView] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Check active session on load
   useEffect(() => {
@@ -55,14 +96,17 @@ const AppContent: React.FC = () => {
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
-        setIsAdminView(false);
         setIsProfileIncomplete(false);
         setIsLoadingSession(false);
-        setCurrentView('home');
+        navigate('/'); 
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
            if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
+           // Se estiver na raiz e logar, vai pro dashboard
+           if (location.pathname === '/' || location.pathname === '') {
+               navigate('/dashboard');
+           }
         }
       }
     });
@@ -71,7 +115,7 @@ const AppContent: React.FC = () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Remove navigate from deps to avoid loops
 
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
@@ -162,24 +206,11 @@ const AppContent: React.FC = () => {
         await fetchUserProfile(user.id, user.email);
     }
     setIsModalOpen(false);
+    navigate('/dashboard');
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setIsAdminView(false);
-    setIsProfileIncomplete(false);
-  };
-
-  const toggleAdminView = () => {
-    if (user?.is_admin) {
-      setIsAdminView(!isAdminView);
-    }
-  };
-
-  const handleNavigate = (view: 'home' | 'faq') => {
-    setCurrentView(view);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (isLoadingSession) {
@@ -187,20 +218,6 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
-    );
-  }
-
-  if (user && isAdminView && user.is_admin) {
-    return <AdminPanel user={user} onExitAdmin={toggleAdminView} onLogout={handleLogout} />;
-  }
-
-  if (user && !isProfileIncomplete) {
-    return (
-      <Dashboard 
-        user={user} 
-        onLogout={handleLogout} 
-        onOpenAdmin={user.is_admin ? toggleAdminView : undefined} 
-      />
     );
   }
 
@@ -233,33 +250,52 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900">
-      <Header 
-        onRegister={() => handleOpenRegister('starter')} 
-        onLogin={handleOpenLogin}
-        onOpenTools={() => setIsToolsOpen(true)}
-        onNavigate={handleNavigate}
-      />
+    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900 flex flex-col">
       
-      <main>
-        {currentView === 'home' ? (
-          <>
-            <Hero onRegister={() => handleOpenRegister('starter')} />
-            <HowItWorks />
-            <Features />
-            <Testimonials />
-            <Pricing onRegister={handleOpenRegister} />
-            <FAQ />
-          </>
-        ) : (
-          <FAQPage onBack={() => handleNavigate('home')} />
-        )}
+      {/* Exibe Header apenas nas rotas públicas ou se usuário não estiver logado */}
+      {!location.pathname.includes('/dashboard') && !location.pathname.includes('/admin') && (
+          <Header 
+            onRegister={() => handleOpenRegister('starter')} 
+            onLogin={handleOpenLogin}
+            onOpenTools={() => setIsToolsOpen(true)}
+            isLoggedIn={!!user}
+          />
+      )}
+      
+      <main className="flex-grow">
+        <Routes>
+            <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
+            
+            <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
+            
+            <Route path="/dashboard" element={
+                <ProtectedRoute user={user} isLoading={isLoadingSession}>
+                    <Dashboard 
+                        user={user!} 
+                        onLogout={handleLogout} 
+                        onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined} 
+                    />
+                </ProtectedRoute>
+            } />
+            
+            <Route path="/admin" element={
+                <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
+                    <AdminPanel 
+                        user={user!} 
+                        onExitAdmin={() => navigate('/dashboard')} 
+                        onLogout={handleLogout} 
+                    />
+                </ProtectedRoute>
+            } />
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
-      <Footer 
-        onRegister={() => handleOpenRegister('starter')} 
-        onNavigate={handleNavigate} 
-      />
+      {/* Footer só aparece na Home */}
+      {location.pathname === '/' && (
+          <Footer onRegister={() => handleOpenRegister('starter')} />
+      )}
       
       <RegistrationModal 
         isOpen={isModalOpen} 
@@ -277,11 +313,14 @@ const AppContent: React.FC = () => {
   );
 };
 
+// Alterado para HashRouter para evitar problemas de 404 em hospedagem estática e conflitos
 const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <HashRouter>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </HashRouter>
   );
 };
 

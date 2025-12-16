@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Scan, Menu, X, Zap, ArrowRight, Globe, Calculator } from 'lucide-react';
+import { Scan, Menu, X, Zap, ArrowRight, Globe, Calculator, User } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
   onRegister: () => void;
   onLogin: () => void;
   onOpenTools: () => void;
-  onNavigate?: (view: 'home' | 'faq') => void;
+  isLoggedIn?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNavigate }) => {
+const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLoggedIn }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+  
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,10 +39,9 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNav
   };
 
   const handleScrollTo = (id: string) => {
-    // Se a função de navegação for fornecida, garante que vamos para a home primeiro
-    if (onNavigate) {
-        onNavigate('home');
-        // Pequeno delay para permitir a renderização da home antes de scrollar
+    if (location.pathname !== '/') {
+        navigate('/');
+        // Pequeno delay para esperar a navegação acontecer
         setTimeout(() => {
             const element = document.getElementById(id);
             if (element) {
@@ -56,8 +59,11 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNav
 
   const handleLogoClick = (e: React.MouseEvent) => {
       e.preventDefault();
-      if (onNavigate) onNavigate('home');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (location.pathname !== '/') {
+          navigate('/');
+      } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
   };
 
   return (
@@ -70,7 +76,7 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNav
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Logo Professional */}
-        <a href="#" onClick={handleLogoClick} className="flex items-center gap-3 group">
+        <a href="/" onClick={handleLogoClick} className="flex items-center gap-3 group">
           <div className="relative flex items-center justify-center w-11 h-11 bg-brand-950 rounded-xl border border-brand-800 shadow-lg shadow-brand-900/20 group-hover:scale-105 transition-all duration-300 group-hover:shadow-brand-600/30">
             <Scan size={24} className="text-brand-400 opacity-90 group-hover:opacity-100 transition-opacity" strokeWidth={1.25} />
             <Zap size={14} className="absolute text-yellow-500 fill-yellow-500 -rotate-12 translate-y-0.5 translate-x-0.5 drop-shadow-sm" strokeWidth={1.5} />
@@ -139,20 +145,32 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNav
             )}
           </div>
 
-          <button 
-            onClick={onLogin}
-            className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            {t.header.login}
-          </button>
+          {isLoggedIn ? (
+            <button 
+                onClick={() => navigate('/dashboard')}
+                className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+            >
+                <User size={16} />
+                Meu Painel
+            </button>
+          ) : (
+            <>
+                <button 
+                    onClick={onLogin}
+                    className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                    {t.header.login}
+                </button>
 
-          <button 
-            onClick={onRegister}
-            className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
-          >
-            {t.header.cta}
-            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+                <button 
+                    onClick={onRegister}
+                    className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+                >
+                    {t.header.cta}
+                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+            </>
+          )}
         </nav>
 
         {/* Mobile Menu Toggle */}
@@ -195,24 +213,38 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, onNav
            </div>
 
            <div className="flex flex-col gap-3 mt-2">
-            <button 
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onLogin();
-                }}
-                className="text-gray-600 font-semibold py-2"
-              >
-                {t.header.login}
-              </button>
-             <button 
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onRegister();
-              }}
-              className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full"
-            >
-              {t.header.cta}
-            </button>
+            {isLoggedIn ? (
+                 <button 
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate('/dashboard');
+                  }}
+                  className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full flex items-center justify-center gap-2"
+                >
+                  <User size={18} /> Meu Painel
+                </button>
+            ) : (
+                <>
+                    <button 
+                        onClick={() => {
+                        setMobileMenuOpen(false);
+                        onLogin();
+                        }}
+                        className="text-gray-600 font-semibold py-2"
+                    >
+                        {t.header.login}
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setMobileMenuOpen(false);
+                            onRegister();
+                        }}
+                        className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full"
+                    >
+                        {t.header.cta}
+                    </button>
+                </>
+            )}
            </div>
         </div>
       )}
