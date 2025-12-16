@@ -81,13 +81,13 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setErrorMsg(null);
       setSuccessMsg(null);
       setShowPassword(false);
+      // Não reseta o form se for completar perfil, para não perder o que já foi carregado
       if (!isCompletingProfile) setFormData({ name: '', email: '', phone: '', password: '' });
     }
   }, [isOpen, mode, isCompletingProfile]);
 
   const friendlyAuthError = (msg: string) => {
     const m = (msg || '').toLowerCase();
-    // Simplified error mapping, could be extended to dictionary if strict multi-lang errors needed
     if (m.includes('database error')) return 'Server Error.';
     if (m.includes('already registered') || m.includes('user already registered')) return 'Email already registered.';
     if (m.includes('invalid login credentials')) return 'Invalid credentials.';
@@ -110,7 +110,6 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setErrorMsg(friendlyAuthError(error.message));
       setLoading(false);
     }
-    // Se der certo, o usuário sai da página, então não precisamos setar loading false
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,16 +127,22 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           if (!fullName) throw new Error(t.auth.errorRequired);
           if (!phoneDigits || phoneDigits.length < 10) throw new Error(t.auth.errorPhone);
 
-          // RPC para salvar profile
-          const { error: rpcError } = await supabase.rpc('register_user_profile', {
-            p_full_name: fullName,
-            p_phone: phoneDigits, 
-            p_email: formData.email // Email já vem do Google/Sessão
-          });
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) throw new Error("User session not found");
 
-          if (rpcError) {
-             console.error(rpcError);
-             throw new Error('Error saving profile. Try again.');
+          // Atualiza a tabela profiles diretamente, pois o usuário já existe
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+                full_name: fullName,
+                phone_e164: phoneDigits
+            })
+            .eq('id', user.id);
+
+          if (updateError) {
+             console.error(updateError);
+             throw new Error('Erro ao salvar perfil. Tente novamente.');
           }
 
           setSuccessMsg(t.auth.successLogin);
@@ -170,13 +175,27 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           return;
         }
 
+        // Tenta registrar perfil via RPC (que faz insert)
         const { error: rpcError } = await supabase.rpc('register_user_profile', {
           p_full_name: fullName,
           p_phone: phoneDigits, 
           p_email: email
         });
 
-        if (rpcError) throw new Error('Phone/Email already in use.');
+        // Se der erro de duplicate key no RPC (significa que o auth criou mas o rpc falhou), tentamos update
+        if (rpcError) {
+             if (rpcError.message.includes('duplicate') || rpcError.message.includes('already exists')) {
+                 // Fallback para update
+                 const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ full_name: fullName, phone_e164: phoneDigits })
+                    .eq('id', authData.user.id);
+                 
+                 if (updateError) throw new Error('Phone/Email already in use.');
+             } else {
+                 throw new Error('Phone/Email already in use.');
+             }
+        }
 
         setSuccessMsg(t.auth.successRegister);
         setTimeout(() => onSuccess(), 1500);

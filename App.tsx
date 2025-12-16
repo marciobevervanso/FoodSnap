@@ -38,6 +38,7 @@ const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdminView, setIsAdminView] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
   // Check active session on load
   useEffect(() => {
@@ -66,11 +67,12 @@ const AppContent: React.FC = () => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminView(false);
+        setIsProfileIncomplete(false);
         setIsLoadingSession(false);
         setCurrentView('home'); // Reset view on logout
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
+           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500)); // Wait for triggers
            await fetchUserProfile(session.user.id, session.user.email);
         }
       }
@@ -86,6 +88,7 @@ const AppContent: React.FC = () => {
     try {
       let profile = null;
       
+      // Tentativa de buscar perfil com retry (caso o trigger de criação ainda esteja rodando)
       for (let i = 0; i < 3; i++) {
         const { data, error } = await supabase
           .from('profiles')
@@ -103,12 +106,29 @@ const AppContent: React.FC = () => {
         if (i < 2) await new Promise(r => setTimeout(r, 500));
       }
 
+      // LÓGICA CORRIGIDA: Se não tiver telefone (comum no Google Auth), NÃO desloga.
+      // Apenas marca como incompleto para abrir o modal de completar cadastro.
       if (!profile || !profile.phone_e164) {
-          console.warn("Perfil incompleto. Bloqueando acesso.");
-          await supabase.auth.signOut();
-          setUser(null);
+          console.warn("Perfil incompleto (Google Auth?). Solicitando complemento.");
+          setIsProfileIncomplete(true);
+          
+          // Setamos um usuário "parcial" para manter a sessão ativa
+          setUser({
+            id: userId,
+            name: profile?.full_name || email?.split('@')[0] || 'Usuário',
+            email: profile?.email || email || '',
+            phone: '',
+            public_id: profile?.public_id || '',
+            plan: 'free',
+            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+            is_admin: false
+          });
+          setIsLoadingSession(false);
           return;
       }
+
+      // Se chegou aqui, o perfil está completo
+      setIsProfileIncomplete(false);
 
       const { data: entitlement } = await supabase
         .from('user_entitlements')
@@ -136,6 +156,7 @@ const AppContent: React.FC = () => {
 
     } catch (error) {
       console.error("Error fetching user profile:", error);
+      // Em caso de erro crítico de rede, mantemos null mas não deslogamos forçado
       setUser(null);
     } finally {
       setIsLoadingSession(false);
@@ -153,7 +174,11 @@ const AppContent: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
+    // Ao finalizar login/cadastro ou completar perfil, recarrega os dados
+    if (user?.id && user?.email) {
+        await fetchUserProfile(user.id, user.email);
+    }
     setIsModalOpen(false);
   };
 
@@ -161,6 +186,7 @@ const AppContent: React.FC = () => {
     await supabase.auth.signOut();
     setUser(null);
     setIsAdminView(false);
+    setIsProfileIncomplete(false);
   };
 
   const toggleAdminView = () => {
@@ -169,7 +195,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Helper function for navigating
   const handleNavigate = (view: 'home' | 'faq') => {
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -188,8 +213,8 @@ const AppContent: React.FC = () => {
     return <AdminPanel user={user} onExitAdmin={toggleAdminView} onLogout={handleLogout} />;
   }
 
-  // Rota Dashboard Usuário
-  if (user) {
+  // Rota Dashboard Usuário (Apenas se perfil estiver completo)
+  if (user && !isProfileIncomplete) {
     return (
       <Dashboard 
         user={user} 
@@ -200,13 +225,14 @@ const AppContent: React.FC = () => {
   }
 
   // Rota Pública (Landing Page ou FAQ Page)
+  // Nota: Se user existe mas isProfileIncomplete é true, renderiza a Home mas com o Modal aberto
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900">
       <Header 
         onRegister={() => handleOpenRegister('starter')} 
         onLogin={handleOpenLogin}
         onOpenTools={() => setIsToolsOpen(true)}
-        onNavigate={handleNavigate} // Passa navegação
+        onNavigate={handleNavigate}
       />
       
       <main>
@@ -226,14 +252,19 @@ const AppContent: React.FC = () => {
 
       <Footer 
         onRegister={() => handleOpenRegister('starter')} 
-        onNavigate={handleNavigate} // Passa navegação
+        onNavigate={handleNavigate} 
       />
       
       <RegistrationModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        // Abre se o usuário clicou OU se o perfil estiver incompleto (força abertura)
+        isOpen={isModalOpen || (!!user && isProfileIncomplete)} 
+        onClose={() => {
+            // Só permite fechar se não for obrigatório completar o perfil
+            if (!isProfileIncomplete) setIsModalOpen(false);
+        }} 
         plan={selectedPlan}
         mode={authMode}
+        isCompletingProfile={!!user && isProfileIncomplete}
         onSuccess={handleAuthSuccess}
       />
       
