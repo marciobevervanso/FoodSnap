@@ -70,6 +70,7 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 1. Efeito principal de Autenticação (Apenas carrega dados, não navega)
   useEffect(() => {
     let mounted = true;
 
@@ -97,14 +98,15 @@ const AppContent: React.FC = () => {
         setUser(null);
         setIsProfileIncomplete(false);
         setIsLoadingSession(false);
-        navigate('/'); 
+        // Logout explícito pode redirecionar para home
+        if (location.pathname !== '/') {
+            navigate('/');
+        }
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
+           // Pequeno delay para garantir consistência do banco após registro
            if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
-           if (location.pathname === '/' || location.pathname === '') {
-               navigate('/dashboard');
-           }
         }
       }
     });
@@ -115,10 +117,21 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
+  // 2. Efeito dedicado para Redirecionamento (Evita loops e race conditions)
+  useEffect(() => {
+    // Só redireciona se terminou de carregar, temos um usuário e estamos na raiz
+    if (!isLoadingSession && user && !isProfileIncomplete) {
+        if (location.pathname === '/' || location.pathname === '') {
+            navigate('/dashboard');
+        }
+    }
+  }, [user, isLoadingSession, isProfileIncomplete, location.pathname, navigate]);
+
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
       let profile = null;
       
+      // Tentativa de retry para garantir que o trigger do Supabase rodou
       for (let i = 0; i < 3; i++) {
         const { data, error } = await supabase
           .from('profiles')
@@ -133,11 +146,15 @@ const AppContent: React.FC = () => {
           break;
         }
         
-        if (i < 2) await new Promise(r => setTimeout(r, 500));
+        // Backoff exponencial simples
+        if (i < 2) await new Promise(r => setTimeout(r, 500 * (i + 1)));
       }
 
+      // Se após as tentativas não tiver perfil ou telefone, marca como incompleto
       if (!profile || !profile.phone_e164) {
-          console.warn("Perfil incompleto. Solicitando complemento.");
+          console.warn("Perfil incompleto ou não encontrado.");
+          
+          // Se for login social e não tiver perfil, precisamos forçar a criação ou complemento
           setIsProfileIncomplete(true);
           
           setUser({
@@ -182,6 +199,8 @@ const AppContent: React.FC = () => {
 
     } catch (error) {
       console.error("Error fetching user profile:", error);
+      // Em caso de erro crítico, desloga para evitar estado zumbi
+      await supabase.auth.signOut();
       setUser(null);
     } finally {
       setIsLoadingSession(false);
@@ -200,15 +219,18 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    if (user?.id && user?.email) {
-        await fetchUserProfile(user.id, user.email);
+    // Recarrega perfil forçadamente após sucesso no modal
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+        await fetchUserProfile(session.user.id, session.user.email);
     }
     setIsModalOpen(false);
-    navigate('/dashboard');
+    // A navegação será tratada pelo useEffect
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    // Navegação é tratada pelo listener SIGNED_OUT
   };
 
   if (isLoadingSession) {
@@ -219,6 +241,7 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Tela de Bloqueio para Perfil Incompleto (ex: Login Social sem telefone)
   if (user && isProfileIncomplete) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
