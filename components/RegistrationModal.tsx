@@ -131,19 +131,20 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           
           if (!user) throw new Error("User session not found");
 
-          // Atualiza a tabela profiles diretamente, pois o usuário já existe
-          const { error: updateError } = await supabase
+          // Use UPSERT instead of UPDATE to ensure row creation if trigger failed
+          const { error: upsertError } = await supabase
             .from('profiles')
-            .update({
+            .upsert({
+                id: user.id,
                 full_name: fullName,
-                phone_e164: phoneDigits
-            })
-            .eq('id', user.id);
+                phone_e164: phoneDigits,
+                email: user.email // Ensure email is passed
+            }, { onConflict: 'id' });
 
-          if (updateError) {
-             console.error('Update Error:', updateError);
+          if (upsertError) {
+             console.error('Upsert Error:', upsertError);
              // Código 23505 = Unique Constraint Violation (Telefone duplicado)
-             if (updateError.code === '23505' || updateError.message?.toLowerCase().includes('duplicate')) {
+             if (upsertError.code === '23505' || upsertError.message?.toLowerCase().includes('duplicate')) {
                  throw new Error('Este telefone já está cadastrado em outra conta. Use outro número ou faça login na conta original.');
              }
              throw new Error('Erro ao salvar perfil. Tente novamente.');
@@ -253,10 +254,10 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     await supabase.auth.signOut();
                     window.location.reload();
                 }}
-                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all flex items-center gap-1 text-xs font-medium bg-white border border-gray-100 shadow-sm"
                 title="Sair desta conta"
               >
-                <LogOut size={18} />
+                <LogOut size={14} /> Sair
               </button>
             )}
 
