@@ -11,29 +11,18 @@ import RegistrationModal from './components/RegistrationModal';
 import CalculatorsModal from './components/CalculatorsModal';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel'; 
-import FAQPage from './components/FAQPage'; // Import novo
+import FAQPage from './components/FAQPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
 import { Loader2, LogOut } from 'lucide-react';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  plan: 'free' | 'pro' | 'trial';
-  public_id: string;
-  avatar?: string;
-  plan_valid_until?: string;
-  is_admin?: boolean; 
-}
+import { User } from './types'; // Importação corrigida
 
 const AppContent: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [selectedPlan, setSelectedPlan] = useState('starter');
-  const [currentView, setCurrentView] = useState<'home' | 'faq'>('home'); // Estado de navegação
+  const [currentView, setCurrentView] = useState<'home' | 'faq'>('home'); 
   
   const [user, setUser] = useState<User | null>(null);
   const [isAdminView, setIsAdminView] = useState(false);
@@ -69,10 +58,10 @@ const AppContent: React.FC = () => {
         setIsAdminView(false);
         setIsProfileIncomplete(false);
         setIsLoadingSession(false);
-        setCurrentView('home'); // Reset view on logout
+        setCurrentView('home');
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500)); // Wait for triggers
+           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
         }
       }
@@ -88,7 +77,6 @@ const AppContent: React.FC = () => {
     try {
       let profile = null;
       
-      // Tentativa de buscar perfil com retry (caso o trigger de criação ainda esteja rodando)
       for (let i = 0; i < 3; i++) {
         const { data, error } = await supabase
           .from('profiles')
@@ -106,13 +94,10 @@ const AppContent: React.FC = () => {
         if (i < 2) await new Promise(r => setTimeout(r, 500));
       }
 
-      // LÓGICA CORRIGIDA: Se não tiver telefone (comum no Google Auth), NÃO desloga.
-      // Apenas marca como incompleto para abrir o modal de completar cadastro.
       if (!profile || !profile.phone_e164) {
-          console.warn("Perfil incompleto (Google Auth?). Solicitando complemento.");
+          console.warn("Perfil incompleto. Solicitando complemento.");
           setIsProfileIncomplete(true);
           
-          // Setamos um usuário "parcial" para manter a sessão ativa
           setUser({
             id: userId,
             name: profile?.full_name || email?.split('@')[0] || 'Usuário',
@@ -127,7 +112,6 @@ const AppContent: React.FC = () => {
           return;
       }
 
-      // Se chegou aqui, o perfil está completo
       setIsProfileIncomplete(false);
 
       const { data: entitlement } = await supabase
@@ -156,7 +140,6 @@ const AppContent: React.FC = () => {
 
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      // Em caso de erro crítico de rede, mantemos null mas não deslogamos forçado
       setUser(null);
     } finally {
       setIsLoadingSession(false);
@@ -175,7 +158,6 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    // Ao finalizar login/cadastro ou completar perfil, recarrega os dados
     if (user?.id && user?.email) {
         await fetchUserProfile(user.id, user.email);
     }
@@ -208,12 +190,10 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Rota Admin
   if (user && isAdminView && user.is_admin) {
     return <AdminPanel user={user} onExitAdmin={toggleAdminView} onLogout={handleLogout} />;
   }
 
-  // Rota Dashboard Usuário (Apenas se perfil estiver completo)
   if (user && !isProfileIncomplete) {
     return (
       <Dashboard 
@@ -224,12 +204,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // NEW: Rota "Completar Perfil" (Onboarding)
-  // Remove a landing page do fundo para focar o usuário na conclusão do cadastro
   if (user && isProfileIncomplete) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
-             {/* Background estilizado */}
              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
              <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-200/30 rounded-full blur-3xl"></div>
              <div className="absolute top-40 -left-20 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl"></div>
@@ -243,7 +220,6 @@ const AppContent: React.FC = () => {
                 onSuccess={handleAuthSuccess}
              />
              
-             {/* Botão de Sair de emergência caso o usuário queira trocar de conta */}
              <div className="absolute bottom-8 left-0 right-0 text-center">
                 <button 
                   onClick={handleLogout}
@@ -256,7 +232,6 @@ const AppContent: React.FC = () => {
       );
   }
 
-  // Rota Pública (Landing Page ou FAQ Page)
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900">
       <Header 

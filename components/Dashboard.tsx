@@ -19,14 +19,14 @@ import {
   QrCode,
   CheckCircle2
 } from 'lucide-react';
-import { User } from '../App';
+import { User } from '../types'; // Importação corrigida
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface DashboardProps {
   user: User;
   onLogout: () => void;
-  onOpenAdmin?: () => void; // Optional prop for admin toggle
+  onOpenAdmin?: () => void; 
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) => {
@@ -35,25 +35,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   
-  // Stats state
   const [stats, setStats] = useState({ totalCount: 0, avgCals: 0 });
   const [loadingStats, setLoadingStats] = useState(false);
 
-  // WhatsApp Config
-  const [whatsappNumber, setWhatsappNumber] = useState("5541999999999"); // Default fallback
+  const [whatsappNumber, setWhatsappNumber] = useState("5541999999999");
   
   useEffect(() => {
     fetchHistory();
     fetchStats();
     fetchSystemSettings();
 
-    // Realtime Subscription: Escuta alterações na tabela app_settings
     const settingsChannel = supabase
       .channel('public:app_settings')
       .on(
         'postgres_changes',
         {
-          event: '*', // Escuta INSERT e UPDATE
+          event: '*', 
           schema: 'public',
           table: 'app_settings',
           filter: 'key=eq.whatsapp_number',
@@ -93,7 +90,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
   const fetchStats = async () => {
     setLoadingStats(true);
     try {
-      // 1. Get Total Count
       const { count, error: countError } = await supabase
         .from('food_analyses')
         .select('*', { count: 'exact', head: true })
@@ -101,7 +97,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
 
       if (countError) throw countError;
 
-      // 2. Get Average Calories
       const { data: calData, error: calError } = await supabase
         .from('food_analyses')
         .select('total_calories')
@@ -145,10 +140,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
 
       if (data) {
         const formatted = data.map((item: any) => {
-          // Parse do ai_structured para pegar os itens
           let itemDetails = '';
           try {
-            // Verifica se é string antes de parsear, se já for objeto usa direto
             const structured = typeof item.ai_structured === 'string' 
                 ? JSON.parse(item.ai_structured) 
                 : item.ai_structured;
@@ -160,7 +153,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
             console.log('Error parsing AI structure', e);
           }
 
-          // Construção da URL do Bucket
           const bucketUrl = `https://mnhgpnqkwuqzpvfrwftp.supabase.co/storage/v1/object/public/consultas/${item.user_id}/${item.id}.jpg`;
 
           return {
@@ -190,11 +182,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
     window.open('https://billing.stripe.com/p/login/test', '_blank');
   };
 
-  // Helper para o nome do plano (Correção do bug de nome vazio)
   const getPlanLabel = () => {
     if (user.plan === 'pro') return 'PRO';
     if (user.plan === 'trial') return 'Trial';
-    // Traduções manuais para o plano gratuito
     if (language === 'pt') return 'Gratuito';
     if (language === 'es') return 'Gratis';
     return 'Free';
@@ -206,7 +196,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-gray-900">
       
-      {/* Sidebar Navigation */}
       <aside className="w-64 bg-white border-r border-gray-200 fixed h-full z-20 hidden md:flex flex-col">
         <div className="p-6 border-b border-gray-100">
            <div className="flex items-center gap-2">
@@ -237,7 +226,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
             onClick={() => setActiveTab('subscription')}
           />
           
-          {/* Admin Link if capable */}
           {onOpenAdmin && (
              <div className="pt-4 mt-4 border-t border-gray-100">
                 <button 
@@ -269,10 +257,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8">
         
-        {/* Mobile Header */}
         <div className="md:hidden flex justify-between items-center mb-6">
            <span className="font-bold text-lg">FoodSnap</span>
            <div className="flex gap-2">
@@ -285,7 +271,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
            </div>
         </div>
 
-        {/* Content Switcher */}
         {activeTab === 'overview' && (
           <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
              <header className="mb-8">
@@ -297,7 +282,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                 </p>
              </header>
 
-             {/* Stats Grid */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <StatCard 
                   title={t.dashboard.statDishes} 
@@ -320,9 +304,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                 />
              </div>
 
-             {/* NEW: Onboarding / QR Code Section */}
              <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm mb-10 flex flex-col md:flex-row gap-8 items-center relative overflow-hidden group">
-                {/* Decorative BG */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2"></div>
 
                 <div className="flex-1 space-y-6">
@@ -351,20 +333,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                     </div>
                 </div>
 
-                {/* QR Code Area */}
                 <div className="flex flex-col items-center justify-center bg-gray-50 p-6 rounded-2xl border border-gray-100 relative">
                      <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-100 mb-3 relative group-hover:scale-105 transition-transform duration-300">
-                        {/* Center Icon Overlay */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-1 rounded-full">
                            <div className="bg-green-500 p-1.5 rounded-full">
                                <MessageCircle size={16} className="text-white" fill="currentColor" />
                            </div>
                         </div>
-                        {/* 
-                            KEY PROPERTY: 
-                            Using whatsappNumber as key forces React to destroy and recreate 
-                            this img element when the number changes, bypassing browser cache. 
-                        */}
                         <img
                             key={whatsappNumber} 
                             src={qrCodeUrl}
@@ -378,7 +353,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                 </div>
              </div>
 
-             {/* Recent Activity */}
              <div>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg text-gray-900">{t.dashboard.recentTitle}</h3>
@@ -435,7 +409,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                                       src={item.img} 
                                       alt={item.category} 
                                       onError={(e) => {
-                                          // Proteção contra Loop Infinito de Erros
                                           const target = e.currentTarget;
                                           if (target.src !== fallbackImage) {
                                               target.src = fallbackImage;
@@ -473,7 +446,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
              </div>
         )}
 
-        {/* ... restante do código da tab subscription ... */}
         {activeTab === 'subscription' && (
             <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
                  <header className="mb-8">
@@ -524,7 +496,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                                 {t.dashboard.btnUpgrade}
                             </button>
                         </div>
-                        {/* Decorative BG */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500 rounded-full blur-[80px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
                     </div>
                 )}
@@ -581,7 +552,6 @@ const HistoryCard = ({ item, fallback }: any) => (
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
               onError={(e) => {
                  const target = e.currentTarget;
-                 // Proteção contra Loop Infinito de Erros
                  if (target.src !== fallback) {
                      target.src = fallback;
                  }

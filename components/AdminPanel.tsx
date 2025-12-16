@@ -14,11 +14,9 @@ import {
   DollarSign,
   Calendar,
   CheckCircle2,
-  XCircle,
   MoreHorizontal,
   UserPlus,
   Activity,
-  AlertTriangle,
   User,
   Clock,
   Info,
@@ -27,7 +25,7 @@ import {
   Smartphone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { User as AppUser } from '../App';
+import { User as AppUser } from '../types'; // Importação corrigida
 
 interface AdminPanelProps {
   user: AppUser;
@@ -35,25 +33,21 @@ interface AdminPanelProps {
   onLogout: () => void;
 }
 
-// Tipos baseados nas novas tabelas SQL
 type TabType = 'overview' | 'users' | 'financial' | 'coupons' | 'settings';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
   
-  // Data States
   const [stats, setStats] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   
-  // Settings State
   const [config, setConfig] = useState({
-      whatsapp_number: '' // Inicializa vazio para não confundir
+      whatsapp_number: '' 
   });
   const [savingConfig, setSavingConfig] = useState(false);
   
-  // UI States
   const [searchTerm, setSearchTerm] = useState('');
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [newCoupon, setNewCoupon] = useState({ code: '', percent: 10, uses: 100 });
@@ -65,18 +59,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // 1. Stats
       const { data: sData } = await supabase.rpc('get_admin_dashboard_stats');
       if (sData) setStats(sData);
 
-      // 2. Users (Robust Fetch)
       await fetchUsersSafe();
 
-      // 3. Coupons
       const { data: cData } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
       if (cData) setCoupons(cData);
 
-      // 4. Settings
       const { data: configData } = await supabase
         .from('app_settings')
         .select('value')
@@ -86,7 +76,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
       if (configData) {
           setConfig({ whatsapp_number: configData.value });
       } else {
-          // Fallback visual apenas se não tiver nada no banco
           setConfig({ whatsapp_number: '5541999999999' });
       }
 
@@ -98,7 +87,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
   };
 
   const fetchUsersSafe = async () => {
-    // Tenta usar a função avançada (RPC) que tem dados do plano
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_admin_users_list', { limit_count: 50 });
     
     if (!rpcError && rpcData) {
@@ -106,7 +94,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
         return;
     }
 
-    // Se falhar (ex: SQL não atualizado), busca o básico da tabela profiles para não deixar a tela vazia
     console.warn("RPC falhou, usando fallback de perfis:", rpcError);
     const { data: basicData } = await supabase
         .from('profiles')
@@ -171,7 +158,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
       }
   };
 
-  // Safe filter logic (handles null names)
   const filteredUsers = usersList.filter(u => 
     (u.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -189,7 +175,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
   return (
     <div className="min-h-screen bg-[#F3F4F6] font-sans text-gray-900 flex">
       
-      {/* Sidebar Premium */}
       <aside className="w-72 bg-gray-900 text-white fixed h-full z-30 hidden lg:flex flex-col shadow-2xl">
         <div className="p-8 border-b border-gray-800">
            <div className="flex items-center gap-3">
@@ -254,7 +239,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 lg:ml-72 p-6 md:p-10 overflow-y-auto">
         {loading ? (
             <div className="flex items-center justify-center h-full">
@@ -263,7 +247,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
         ) : (
             <div className="max-w-7xl mx-auto space-y-8">
                 
-                {/* Top Bar */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
@@ -295,10 +278,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                     </div>
                 </div>
 
-                {/* --- OVERVIEW TAB --- */}
                 {activeTab === 'overview' && stats && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* Stats Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <KpiCard 
                                 title="Receita Total" 
@@ -330,9 +311,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                             />
                         </div>
 
-                        {/* Recent Activity Section */}
                         <div className="grid lg:grid-cols-3 gap-8">
-                           {/* Chart placeholder area */}
                            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                               <h3 className="font-bold text-gray-900 mb-6">Crescimento de Receita (Simulado)</h3>
                               <div className="h-64 flex items-end gap-4">
@@ -350,7 +329,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                               </div>
                            </div>
 
-                           {/* Quick Actions / Recent */}
                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                <h3 className="font-bold text-gray-900 mb-4">Ações Rápidas</h3>
                                <div className="space-y-3">
@@ -374,7 +352,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                     </div>
                 )}
 
-                {/* --- USERS TAB --- */}
                 {activeTab === 'users' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex gap-4">
@@ -454,7 +431,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                     </div>
                 )}
 
-                {/* --- COUPONS TAB --- */}
                 {activeTab === 'coupons' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
@@ -512,7 +488,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                     </div>
                 )}
 
-                {/* --- SETTINGS TAB --- */}
                 {activeTab === 'settings' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl">
                          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -569,7 +544,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
                     </div>
                 )}
 
-                {/* --- FINANCIAL TAB --- */}
                 {activeTab === 'financial' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
@@ -590,7 +564,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
         )}
       </main>
 
-      {/* Coupon Modal */}
       {showCouponModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200 border border-gray-100">
@@ -663,7 +636,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onExitAdmin, onLogout }) 
   );
 };
 
-// UI Components
 const NavButton = ({ active, onClick, icon, label }: any) => (
     <button 
         onClick={onClick}

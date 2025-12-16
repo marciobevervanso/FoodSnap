@@ -76,7 +76,15 @@ export interface AnalysisResult {
 }
 
 export const analyzeImage = async (base64Image: string, mimeType: string = 'image/jpeg'): Promise<AnalysisResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Safe Access to process.env for browser environments
+  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : (window as any).process?.env?.API_KEY;
+
+  if (!apiKey) {
+      console.error("API KEY Missing");
+      throw new Error("API Key not configured");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({
