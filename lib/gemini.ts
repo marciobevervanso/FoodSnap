@@ -64,7 +64,6 @@ export interface AnalysisResult {
     fiber: number;
     sugar: number;
     sodium_mg: number;
-    flags: string[];
   };
   category: string;
   health_score: number;
@@ -110,9 +109,7 @@ export const analyzeImage = async (base64Image: string, mimeType: string = 'imag
     });
 
     if (response.text) {
-      // Limpa blocos de código markdown se presentes (ex: ```json ... ```)
-      const cleanText = response.text.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleanText) as AnalysisResult;
+      return JSON.parse(response.text) as AnalysisResult;
     }
     
     throw new Error("Resposta vazia da IA");

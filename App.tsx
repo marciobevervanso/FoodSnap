@@ -1,5 +1,5 @@
 import React, { useState, useEffect, PropsWithChildren } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -29,15 +29,11 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-            <p className="text-sm text-gray-500 font-medium">Carregando perfil...</p>
-        </div>
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
   
-  // Se terminou de carregar e não tem usuário, manda pra home
   if (!user) {
     return <Navigate to="/" replace />;
   }
@@ -50,23 +46,16 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
 };
 
 // Componente da Home Page (Landing)
-// Se o usuário estiver logado, redireciona automaticamente para o dashboard
-const HomePage = ({ onRegister, onOpenTools, user, isLoading }: { onRegister: (plan: string) => void, onOpenTools: () => void, user: User | null, isLoading: boolean }) => {
-    if (!isLoading && user) {
-        return <Navigate to="/dashboard" replace />;
-    }
-
-    return (
-      <div className="flex flex-col min-h-screen">
-        <Hero onRegister={() => onRegister('starter')} />
-        <HowItWorks />
-        <Features />
-        <Testimonials />
-        <Pricing onRegister={onRegister} />
-        <FAQ />
-      </div>
-    );
-};
+const HomePage = ({ onRegister, onOpenTools }: { onRegister: (plan: string) => void, onOpenTools: () => void }) => (
+  <div className="flex flex-col min-h-screen">
+    <Hero onRegister={() => onRegister('starter')} />
+    <HowItWorks />
+    <Features />
+    <Testimonials />
+    <Pricing onRegister={onRegister} />
+    <FAQ />
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,132 +64,129 @@ const AppContent: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState('starter');
   
   const [user, setUser] = useState<User | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true); // Começa true para evitar flash da home
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Função centralizada para buscar perfil
-  const getProfile = async (sessionUser: any) => {
-      try {
-          // 1. Tenta buscar perfil existente
-          let { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', sessionUser.id)
-            .maybeSingle();
-            
-          // Se não achou perfil, mas tem sessão (caso raro de login social sem trigger), tenta criar ou marcar incompleto
-          if (!profile) {
-              // Retry simples
-              await new Promise(r => setTimeout(r, 1000));
-              const retry = await supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
-              profile = retry.data;
-          }
-
-          // Validação crítica: Precisa ter telefone
-          if (!profile || !profile.phone_e164) {
-             setIsProfileIncomplete(true);
-             // Cria user temporário para permitir o preenchimento do modal
-             return {
-                id: sessionUser.id,
-                name: profile?.full_name || sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'Usuário',
-                email: sessionUser.email || '',
-                phone: '',
-                public_id: profile?.public_id || '',
-                plan: 'free',
-                avatar: profile?.avatar_url || sessionUser.user_metadata?.avatar_url,
-                is_admin: false
-             } as User;
-          }
-
-          setIsProfileIncomplete(false);
-
-          // 2. Busca Assinatura
-          const { data: entitlement } = await supabase
-            .from('user_entitlements')
-            .select('*')
-            .eq('user_id', sessionUser.id)
-            .maybeSingle();
-
-          let plan: 'free' | 'pro' | 'trial' = 'free';
-          if (entitlement) {
-            if (entitlement.entitlement_code === 'pro' && entitlement.is_active) plan = 'pro';
-            else if (entitlement.entitlement_code === 'trial' && entitlement.is_active) plan = 'trial';
-          }
-
-          return {
-            id: sessionUser.id,
-            name: profile.full_name || 'Usuário',
-            email: sessionUser.email || '',
-            phone: profile.phone_e164,
-            public_id: profile.public_id,
-            plan: plan,
-            plan_valid_until: entitlement?.valid_until,
-            avatar: profile.avatar_url,
-            is_admin: profile.is_admin || false 
-          } as User;
-
-      } catch (error) {
-          console.error("Erro ao montar perfil:", error);
-          return null;
-      }
-  };
-
-  // Efeito Único de Autenticação
   useEffect(() => {
     let mounted = true;
 
-    const initialize = async () => {
-        try {
-            // 1. Pega sessão atual
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session?.user) {
-                const userData = await getProfile(session.user);
-                if (mounted) setUser(userData);
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            if (mounted) setIsLoadingSession(false);
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user && mounted) {
+           await fetchUserProfile(session.user.id, session.user.email);
+        } else if (mounted) {
+           setIsLoadingSession(false);
         }
+      } catch (err) {
+        console.error("Auth init error:", err);
+        if (mounted) setIsLoadingSession(false);
+      }
     };
 
-    initialize();
+    initAuth();
 
-    // 2. Escuta mudanças (Login/Logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!mounted) return;
-        
-        // Se for logout, limpa tudo
-        if (event === 'SIGNED_OUT') {
-            setUser(null);
-            setIsProfileIncomplete(false);
-            setIsLoadingSession(false);
-            navigate('/'); 
-        } 
-        // Se for login, carrega o perfil
-        else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            if (session?.user) {
-                // Não seta loading true aqui para não piscar a tela se for refresh
-                if (event === 'SIGNED_IN') setIsLoadingSession(true);
-                
-                const userData = await getProfile(session.user);
-                if (mounted) {
-                    setUser(userData);
-                    setIsLoadingSession(false);
-                }
-            }
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsProfileIncomplete(false);
+        setIsLoadingSession(false);
+        navigate('/'); 
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
+           await fetchUserProfile(session.user.id, session.user.email);
+           if (location.pathname === '/' || location.pathname === '') {
+               navigate('/dashboard');
+           }
         }
+      }
     });
 
     return () => {
-        mounted = false;
-        subscription.unsubscribe();
+      mounted = false;
+      subscription.unsubscribe();
     };
   }, []);
+
+  const fetchUserProfile = async (userId: string, email?: string) => {
+    try {
+      let profile = null;
+      
+      for (let i = 0; i < 3; i++) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle(); 
+
+        if (error) throw error;
+
+        if (data) {
+          profile = data;
+          break;
+        }
+        
+        if (i < 2) await new Promise(r => setTimeout(r, 500));
+      }
+
+      if (!profile || !profile.phone_e164) {
+          console.warn("Perfil incompleto. Solicitando complemento.");
+          setIsProfileIncomplete(true);
+          
+          setUser({
+            id: userId,
+            name: profile?.full_name || email?.split('@')[0] || 'Usuário',
+            email: profile?.email || email || '',
+            phone: '',
+            public_id: profile?.public_id || '',
+            plan: 'free',
+            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+            is_admin: false
+          });
+          setIsLoadingSession(false);
+          return;
+      }
+
+      setIsProfileIncomplete(false);
+
+      const { data: entitlement } = await supabase
+        .from('user_entitlements')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      let plan: 'free' | 'pro' | 'trial' = 'free';
+      if (entitlement) {
+        if (entitlement.entitlement_code === 'pro' && entitlement.is_active) plan = 'pro';
+        else if (entitlement.entitlement_code === 'trial' && entitlement.is_active) plan = 'trial';
+      }
+
+      setUser({
+        id: userId,
+        name: profile.full_name || 'Usuário',
+        email: profile.email || email || '',
+        phone: profile.phone_e164,
+        public_id: profile.public_id,
+        plan: plan,
+        plan_valid_until: entitlement?.valid_until,
+        avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
+        is_admin: profile.is_admin || false 
+      });
+
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      setUser(null);
+    } finally {
+      setIsLoadingSession(false);
+    }
+  };
 
   const handleOpenRegister = (plan: string = 'starter') => {
     setSelectedPlan(plan);
@@ -214,25 +200,26 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    // Força recarregamento após sucesso no modal
-    setIsLoadingSession(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-        const userData = await getProfile(session.user);
-        setUser(userData);
+    if (user?.id && user?.email) {
+        await fetchUserProfile(user.id, user.email);
     }
-    setIsLoadingSession(false);
     setIsModalOpen(false);
+    navigate('/dashboard');
   };
 
   const handleLogout = async () => {
-    setIsLoadingSession(true); // Mostra loader enquanto desloga
     await supabase.auth.signOut();
-    // O listener SIGNED_OUT vai tratar o resto
   };
 
-  // Tela de Bloqueio para Perfil Incompleto
-  if (!isLoadingSession && user && isProfileIncomplete) {
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
+
+  if (user && isProfileIncomplete) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
@@ -256,15 +243,6 @@ const AppContent: React.FC = () => {
       );
   }
 
-  // Loader global inicial
-  if (isLoadingSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
-      </div>
-    );
-  }
-
   const isInternalPage = location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
 
   return (
@@ -281,15 +259,7 @@ const AppContent: React.FC = () => {
       
       <main className="flex-grow flex flex-col w-full">
         <Routes>
-            {/* Rota Home agora redireciona se tiver user */}
-            <Route path="/" element={
-                <HomePage 
-                    onRegister={handleOpenRegister} 
-                    onOpenTools={() => setIsToolsOpen(true)} 
-                    user={user}
-                    isLoading={isLoadingSession}
-                />
-            } />
+            <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
             
             <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
             
@@ -313,8 +283,8 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
             } />
             
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Catch-all garantido */}
+            <Route path="*" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
         </Routes>
       </main>
 
@@ -338,14 +308,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Alterado para BrowserRouter para URLs limpas (sem #)
+// Usando HashRouter para máxima compatibilidade
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <LanguageProvider>
         <AppContent />
       </LanguageProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 };
 

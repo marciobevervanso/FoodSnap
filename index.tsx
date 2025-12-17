@@ -6,9 +6,10 @@ const container = document.getElementById('root');
 
 if (container) {
   const root = createRoot(container);
-  // StrictMode removido para estabilidade de autenticação em ambiente de desenvolvimento
   root.render(
+    <React.StrictMode>
       <App />
+    </React.StrictMode>
   );
 } else {
   console.error("FATAL: Elemento root não encontrado no HTML.");
