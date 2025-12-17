@@ -1,5 +1,5 @@
 import React, { useState, useEffect, PropsWithChildren } from 'react';
-import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -338,14 +338,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Usando HashRouter para evitar erros 404 em hospedagens estáticas sem rewrite rules
+// Alterado para BrowserRouter para URLs limpas (sem #)
 const App: React.FC = () => {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <LanguageProvider>
         <AppContent />
       </LanguageProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 
