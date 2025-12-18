@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -39,10 +40,7 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({
   }
 
   if (!user) return <Navigate to="/" replace />;
-
-  if (requiredAdmin && !user.is_admin) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (requiredAdmin && !user.is_admin) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 };
@@ -79,11 +77,13 @@ const AppContent: React.FC = () => {
 
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      if (error) throw error;
 
       if (!profile || !profile.phone_e164) {
         setIsProfileIncomplete(true);
@@ -94,7 +94,9 @@ const AppContent: React.FC = () => {
           phone: '',
           public_id: profile?.public_id || '',
           plan: 'free',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+          avatar:
+            profile?.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
           is_admin: false,
         });
         return;
@@ -108,10 +110,10 @@ const AppContent: React.FC = () => {
         .eq('user_id', userId)
         .maybeSingle();
 
-      const plan =
-        entitlement && (entitlement as any).is_active
-          ? ((entitlement as any).entitlement_code as any)
-          : 'free';
+      let plan: 'free' | 'pro' | 'trial' = 'free';
+      if (entitlement && (entitlement as any).is_active) {
+        plan = (entitlement as any).entitlement_code as any;
+      }
 
       setUser({
         id: userId,
@@ -127,69 +129,108 @@ const AppContent: React.FC = () => {
         is_admin: profile.is_admin || false,
       });
     } catch (err) {
-      console.error('fetchUserProfile error:', err);
+      console.error('Error fetching user profile:', err);
       setUser(null);
     } finally {
       setIsLoadingSession(false);
     }
   };
 
+  // Auth init + listener (com "airbag" pra não travar no loader)
   useEffect(() => {
     let mounted = true;
 
-    const safety = setTimeout(() => {
+    const safety = window.setTimeout(() => {
       if (mounted) setIsLoadingSession(false);
-    }, 6000);
+    }, 8000);
 
-    const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
+    const initAuth = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) console.warn('getSession error:', error);
 
-      if (data.session?.user) {
-        await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
-      } else {
-        setIsLoadingSession(false);
+        if (!mounted) return;
+
+        if (data.session?.user) {
+          await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
+        } else {
+          setIsLoadingSession(false);
+        }
+      } catch (err) {
+        console.error('Auth init error:', err);
+        if (mounted) setIsLoadingSession(false);
       }
     };
 
-    init();
+    initAuth();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setIsProfileIncomplete(false);
-        setIsLoadingSession(false);
-        navigate('/', { replace: true });
-        return;
-      }
-
-      if (session?.user) {
-        await fetchUserProfile(session.user.id, session.user.email || undefined);
-
-        if (window.location.pathname === '/' || window.location.pathname === '') {
-          navigate('/dashboard', { replace: true });
+      try {
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsProfileIncomplete(false);
+          setIsLoadingSession(false);
+          navigate('/', { replace: true });
+          return;
         }
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          if (session?.user) {
+            await fetchUserProfile(session.user.id, session.user.email || undefined);
+
+            const path = window.location.pathname || '/';
+            if (path === '/' || path === '') {
+              navigate('/dashboard', { replace: true });
+            }
+          } else {
+            setIsLoadingSession(false);
+          }
+        }
+      } catch (err) {
+        console.error('onAuthStateChange error:', err);
+        setIsLoadingSession(false);
       }
     });
 
     return () => {
       mounted = false;
-      clearTimeout(safety);
+      window.clearTimeout(safety);
       sub.subscription.unsubscribe();
     };
   }, [navigate]);
 
+  // UI handlers (mantém “Área do Membro” funcionando)
+  const handleOpenRegister = (plan: string = 'starter') => {
+    setSelectedPlan(plan);
+    setAuthMode('register');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenLogin = () => {
+    setAuthMode('login');
+    setIsModalOpen(true);
+  };
+
+  // ✅ NÃO depende de `user` local (que ainda pode ser null)
   const handleAuthSuccess = async () => {
     setIsModalOpen(false);
     setIsLoadingSession(true);
 
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.user) {
-      await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
-      navigate('/dashboard', { replace: true });
-    } else {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.warn('getSession after auth error:', error);
+
+      if (data.session?.user) {
+        await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
+        navigate('/dashboard', { replace: true });
+      } else {
+        setIsLoadingSession(false);
+        navigate('/', { replace: true });
+      }
+    } catch (err) {
+      console.error('handleAuthSuccess error:', err);
       setIsLoadingSession(false);
     }
   };
@@ -207,31 +248,64 @@ const AppContent: React.FC = () => {
     );
   }
 
-  const isInternal =
+  const isInternalPage =
     location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {!isInternal && (
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col w-full">
+      {!isInternalPage && (
         <Header
-          onRegister={() => handleAuthSuccess()}
-          onLogin={() => setAuthMode('login')}
+          onRegister={() => handleOpenRegister('starter')}
+          onLogin={handleOpenLogin}
           onOpenTools={() => setIsToolsOpen(true)}
           isLoggedIn={!!user}
         />
       )}
 
-      <main className="flex-grow">
+      <main className="flex-grow flex flex-col w-full">
         <Routes>
-          <Route path="/" element={<HomePage onRegister={() => setIsModalOpen(true)} onOpenTools={() => setIsToolsOpen(true)} />} />
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onRegister={handleOpenRegister}
+                onOpenTools={() => setIsToolsOpen(true)}
+              />
+            }
+          />
           <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
-          <Route path="/dashboard" element={<ProtectedRoute user={user} isLoading={isLoadingSession}><Dashboard user={user!} onLogout={handleLogout} /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin><AdminPanel user={user!} onExitAdmin={() => navigate('/dashboard')} onLogout={handleLogout} /></ProtectedRoute>} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute user={user} isLoading={isLoadingSession}>
+                <Dashboard
+                  user={user!}
+                  onLogout={handleLogout}
+                  onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined}
+                />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin>
+                <AdminPanel
+                  user={user!}
+                  onExitAdmin={() => navigate('/dashboard')}
+                  onLogout={handleLogout}
+                />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {!isInternal && <Footer onRegister={() => setIsModalOpen(true)} />}
+      {!isInternalPage && <Footer onRegister={() => handleOpenRegister('starter')} />}
 
       <RegistrationModal
         isOpen={isModalOpen || (!!user && isProfileIncomplete)}
@@ -247,12 +321,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-const App: React.FC = () => (
-  <BrowserRouter>
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
-  </BrowserRouter>
-);
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </BrowserRouter>
+  );
+};
 
 export default App;
