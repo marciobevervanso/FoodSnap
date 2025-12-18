@@ -12,7 +12,25 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-const buildUserFromProfile = async (authUser: any): Promise<{ user: User | null; incomplete: boolean }> => {
+const REFRESH_TIMEOUT_MS = 12000; // evita travar 2-3 min no Safari
+const SAFETY_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label = 'timeout'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(label)), ms);
+    p.then((v) => {
+      window.clearTimeout(t);
+      resolve(v);
+    }).catch((e) => {
+      window.clearTimeout(t);
+      reject(e);
+    });
+  });
+}
+
+const buildUserFromProfile = async (
+  authUser: any
+): Promise<{ user: User | null; incomplete: boolean }> => {
   const userId = authUser.id as string;
   const email = (authUser.email as string) || '';
 
@@ -24,7 +42,6 @@ const buildUserFromProfile = async (authUser: any): Promise<{ user: User | null;
 
   if (error) throw error;
 
-  // Se não tem profile/phone => força completar cadastro (modal)
   if (!profile || !profile.phone_e164) {
     const nameFromMeta =
       authUser?.user_metadata?.full_name ||
@@ -48,7 +65,6 @@ const buildUserFromProfile = async (authUser: any): Promise<{ user: User | null;
     return { user: u, incomplete: true };
   }
 
-  // Entitlements (plano)
   const { data: entitlement } = await supabase
     .from('user_entitlements')
     .select('*')
@@ -85,37 +101,54 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const mountedRef = useRef(true);
   const inFlightRef = useRef<Promise<void> | null>(null);
 
+  const clearState = () => {
+    setUser(null);
+    setIsProfileIncomplete(false);
+  };
+
   const refresh = async () => {
-    // evita “tempestade” de refresh em eventos/token refresh + re-render
+    // evita tempestade, MAS não pode travar pra sempre
     if (inFlightRef.current) return inFlightRef.current;
 
     inFlightRef.current = (async () => {
       try {
-        setIsLoading(true);
-        const { data, error } = await supabase.auth.getSession();
+        if (mountedRef.current) setIsLoading(true);
+
+        const { data, error } = await withTimeout(
+          supabase.auth.getSession(),
+          REFRESH_TIMEOUT_MS,
+          'getSession_timeout'
+        );
+
         if (error) console.warn('getSession error:', error);
 
         const sessionUser = data.session?.user;
         if (!sessionUser) {
           if (!mountedRef.current) return;
-          setUser(null);
-          setIsProfileIncomplete(false);
+          clearState();
           return;
         }
 
-        const { user: appUser, incomplete } = await buildUserFromProfile(sessionUser);
+        // profile + entitlements também podem travar => timeout
+        const { user: appUser, incomplete } = await withTimeout(
+          buildUserFromProfile(sessionUser),
+          REFRESH_TIMEOUT_MS,
+          'buildUser_timeout'
+        );
+
         if (!mountedRef.current) return;
         setUser(appUser);
         setIsProfileIncomplete(incomplete);
       } catch (err) {
         console.error('Auth refresh error:', err);
         if (!mountedRef.current) return;
-        setUser(null);
-        setIsProfileIncomplete(false);
+        // se deu timeout/erro, não deixa o app preso tentando “reviver”
+        clearState();
       } finally {
+        // ✅ SEMPRE limpa inFlight, mesmo se safety timer já soltou loading
+        inFlightRef.current = null;
         if (!mountedRef.current) return;
         setIsLoading(false);
-        inFlightRef.current = null;
       }
     })();
 
@@ -123,38 +156,45 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   };
 
   const signOut = async () => {
-    setIsLoading(true);
-    await supabase.auth.signOut();
-    // onAuthStateChange vai limpar o resto, mas garantimos aqui também
-    setUser(null);
-    setIsProfileIncomplete(false);
-    setIsLoading(false);
+    // ✅ desloga “na hora” no estado do app (sem depender de eventos)
+    if (mountedRef.current) setIsLoading(true);
+    clearState();
+
+    try {
+      await withTimeout(supabase.auth.signOut(), 8000, 'signOut_timeout');
+    } catch (e) {
+      console.warn('signOut error/timeout:', e);
+    } finally {
+      // ✅ garante que não fica preso
+      inFlightRef.current = null;
+      if (mountedRef.current) setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     mountedRef.current = true;
 
-    // Airbag: nunca ficar preso em loading
     const safety = window.setTimeout(() => {
-      if (mountedRef.current) setIsLoading(false);
-    }, 8000);
+      if (!mountedRef.current) return;
+      // ✅ se travou, solta loading e também libera refresh futuro
+      inFlightRef.current = null;
+      setIsLoading(false);
+    }, SAFETY_TIMEOUT_MS);
 
-    // init
     refresh();
 
-    // listener
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
-      // regra: auth events só atualizam estado. NÃO navegam.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (!mountedRef.current) return;
+
       if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setIsProfileIncomplete(false);
+        clearState();
         setIsLoading(false);
+        inFlightRef.current = null;
         return;
       }
 
-      // SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION
-      await refresh();
+      // não trava a fila de eventos com await
+      refresh().catch(() => {});
     });
 
     return () => {
