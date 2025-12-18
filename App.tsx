@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, PropsWithChildren } from 'react';
-import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -12,11 +11,11 @@ import Footer from './components/Footer';
 import RegistrationModal from './components/RegistrationModal';
 import CalculatorsModal from './components/CalculatorsModal';
 import Dashboard from './components/Dashboard';
-import AdminPanel from './components/AdminPanel'; 
+import AdminPanel from './components/AdminPanel';
 import FAQPage from './components/FAQPage';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { User } from './types';
 
 // Componente Wrapper para proteger rotas privadas
@@ -26,7 +25,12 @@ interface ProtectedRouteProps {
   requiredAdmin?: boolean;
 }
 
-const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ children, user, isLoading, requiredAdmin = false }) => {
+const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({
+  children,
+  user,
+  isLoading,
+  requiredAdmin = false,
+}) => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -34,7 +38,7 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
@@ -47,7 +51,13 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
 };
 
 // Componente da Home Page (Landing)
-const HomePage = ({ onRegister, onOpenTools }: { onRegister: (plan: string) => void, onOpenTools: () => void }) => (
+const HomePage = ({
+  onRegister,
+  onOpenTools,
+}: {
+  onRegister: (plan: string) => void;
+  onOpenTools: () => void;
+}) => (
   <div className="flex flex-col min-h-screen">
     <Hero onRegister={() => onRegister('starter')} />
     <HowItWorks />
@@ -63,7 +73,7 @@ const AppContent: React.FC = () => {
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [selectedPlan, setSelectedPlan] = useState('starter');
-  
+
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
@@ -71,57 +81,48 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 1. SOLUÇÃO DO LOOP: Intercepta o hash do Supabase antes que o Router quebre
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && (hash.includes('access_token=') || hash.includes('type=recovery') || hash.includes('error='))) {
-      // É um retorno de autenticação. 
-      // O Supabase processa isso internamente, mas precisamos limpar a URL 
-      // para que o HashRouter não tente navegar para "#/access_token=..."
-      console.log("OAuth detectado no hash. Limpando para estabilidade do roteador.");
-      
-      // Remove o fragmento da URL visualmente, mantendo a funcionalidade do Supabase
-      setTimeout(() => {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      }, 0);
-    }
-  }, []);
-
-  // 2. INICIALIZAÇÃO E LISTENER
+  // INICIALIZAÇÃO E LISTENER
   useEffect(() => {
     let mounted = true;
 
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (session?.user && mounted) {
-           await fetchUserProfile(session.user.id, session.user.email);
+          await fetchUserProfile(session.user.id, session.user.email);
         } else if (mounted) {
-           setIsLoadingSession(false);
+          setIsLoadingSession(false);
         }
       } catch (err) {
-        console.error("Auth init error:", err);
+        console.error('Auth init error:', err);
         if (mounted) setIsLoadingSession(false);
       }
     };
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsProfileIncomplete(false);
         setIsLoadingSession(false);
-        navigate('/'); 
+        navigate('/', { replace: true });
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           await fetchUserProfile(session.user.id, session.user.email);
-           // Se o usuário acabou de logar e está na home, manda pro dashboard
-           if (window.location.hash === '#/' || window.location.hash === '') {
-               navigate('/dashboard');
-           }
+          await fetchUserProfile(session.user.id, session.user.email);
+
+          // Se o usuário acabou de logar e está na home, manda pro dashboard
+          const path = window.location.pathname || '/';
+          if (path === '/' || path === '') {
+            navigate('/dashboard', { replace: true });
+          }
         }
       }
     });
@@ -130,6 +131,7 @@ const AppContent: React.FC = () => {
       mounted = false;
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUserProfile = async (userId: string, email?: string) => {
@@ -138,49 +140,54 @@ const AppContent: React.FC = () => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); 
+        .maybeSingle();
 
       if (error) throw error;
 
       if (!profile || !profile.phone_e164) {
-          setIsProfileIncomplete(true);
-          setUser({
-            id: userId,
-            name: profile?.full_name || email?.split('@')[0] || 'Usuário',
-            email: profile?.email || email || '',
-            phone: '',
-            public_id: profile?.public_id || '',
-            plan: 'free',
-            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
-            is_admin: false
-          });
+        setIsProfileIncomplete(true);
+        setUser({
+          id: userId,
+          name: profile?.full_name || email?.split('@')[0] || 'Usuário',
+          email: profile?.email || email || '',
+          phone: '',
+          public_id: profile?.public_id || '',
+          plan: 'free',
+          avatar:
+            profile?.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+          is_admin: false,
+        });
       } else {
-          setIsProfileIncomplete(false);
-          const { data: entitlement } = await supabase
-            .from('user_entitlements')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+        setIsProfileIncomplete(false);
 
-          let plan: 'free' | 'pro' | 'trial' = 'free';
-          if (entitlement && entitlement.is_active) {
-            plan = entitlement.entitlement_code as any;
-          }
+        const { data: entitlement } = await supabase
+          .from('user_entitlements')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-          setUser({
-            id: userId,
-            name: profile.full_name || 'Usuário',
-            email: profile.email || email || '',
-            phone: profile.phone_e164,
-            public_id: profile.public_id,
-            plan: plan,
-            plan_valid_until: entitlement?.valid_until,
-            avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
-            is_admin: profile.is_admin || false 
-          });
+        let plan: 'free' | 'pro' | 'trial' = 'free';
+        if (entitlement && (entitlement as any).is_active) {
+          plan = (entitlement as any).entitlement_code as any;
+        }
+
+        setUser({
+          id: userId,
+          name: profile.full_name || 'Usuário',
+          email: profile.email || email || '',
+          phone: profile.phone_e164,
+          public_id: profile.public_id,
+          plan: plan,
+          plan_valid_until: (entitlement as any)?.valid_until,
+          avatar:
+            profile.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
+          is_admin: profile.is_admin || false,
+        });
       }
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error('Error fetching user profile:', error);
     } finally {
       setIsLoadingSession(false);
     }
@@ -199,10 +206,10 @@ const AppContent: React.FC = () => {
 
   const handleAuthSuccess = async () => {
     if (user?.id) {
-        await fetchUserProfile(user.id, user.email);
+      await fetchUserProfile(user.id, user.email);
     }
     setIsModalOpen(false);
-    navigate('/dashboard');
+    navigate('/dashboard', { replace: true });
   };
 
   const handleLogout = async () => {
@@ -219,73 +226,83 @@ const AppContent: React.FC = () => {
     );
   }
 
-  const isInternalPage = location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
+  const isInternalPage =
+    location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col w-full">
       {!isInternalPage && (
-          <Header 
-            onRegister={() => handleOpenRegister('starter')} 
-            onLogin={handleOpenLogin}
-            onOpenTools={() => setIsToolsOpen(true)}
-            isLoggedIn={!!user}
-          />
+        <Header
+          onRegister={() => handleOpenRegister('starter')}
+          onLogin={handleOpenLogin}
+          onOpenTools={() => setIsToolsOpen(true)}
+          isLoggedIn={!!user}
+        />
       )}
-      
+
       <main className="flex-grow flex flex-col w-full">
         <Routes>
-            <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
-            <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
-            <Route path="/dashboard" element={
-                <ProtectedRoute user={user} isLoading={isLoadingSession}>
-                    <Dashboard 
-                        user={user!} 
-                        onLogout={handleLogout} 
-                        onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined} 
-                    />
-                </ProtectedRoute>
-            } />
-            <Route path="/admin" element={
-                <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
-                    <AdminPanel 
-                        user={user!} 
-                        onExitAdmin={() => navigate('/dashboard')} 
-                        onLogout={handleLogout} 
-                    />
-                </ProtectedRoute>
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onRegister={handleOpenRegister}
+                onOpenTools={() => setIsToolsOpen(true)}
+              />
+            }
+          />
+          <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute user={user} isLoading={isLoadingSession}>
+                <Dashboard
+                  user={user!}
+                  onLogout={handleLogout}
+                  onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
+                <AdminPanel
+                  user={user!}
+                  onExitAdmin={() => navigate('/dashboard')}
+                  onLogout={handleLogout}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {!isInternalPage && (
-          <Footer onRegister={() => handleOpenRegister('starter')} />
-      )}
-      
-      <RegistrationModal 
-        isOpen={isModalOpen || (!!user && isProfileIncomplete)} 
-        onClose={() => !isProfileIncomplete && setIsModalOpen(false)} 
+      {!isInternalPage && <Footer onRegister={() => handleOpenRegister('starter')} />}
+
+      <RegistrationModal
+        isOpen={isModalOpen || (!!user && isProfileIncomplete)}
+        onClose={() => !isProfileIncomplete && setIsModalOpen(false)}
         plan={selectedPlan}
         mode={isProfileIncomplete ? 'register' : authMode}
         isCompletingProfile={isProfileIncomplete}
         onSuccess={handleAuthSuccess}
       />
-      
-      <CalculatorsModal 
-        isOpen={isToolsOpen}
-        onClose={() => setIsToolsOpen(false)}
-      />
+
+      <CalculatorsModal isOpen={isToolsOpen} onClose={() => setIsToolsOpen(false)} />
     </div>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <LanguageProvider>
         <AppContent />
       </LanguageProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 
