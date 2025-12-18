@@ -8,33 +8,30 @@ const AuthCallback = () => {
 
   useEffect(() => {
     let alive = true;
+    
+    // ✅ Timeout de segurança caso algo dê errado
+    const timeout = setTimeout(() => {
+      if (alive) {
+        console.warn('Auth callback timeout - redirecting to home');
+        navigate('/', { replace: true });
+      }
+    }, 10000); // 10 segundos
 
     const finishAuth = async () => {
       try {
-        // 🔑 ISSO É O MAIS IMPORTANTE
         const { data, error } = await supabase.auth.getSession();
-
+        
         if (error) {
           console.error('Auth callback error:', error);
           navigate('/', { replace: true });
           return;
         }
-
+        
         if (data.session?.user) {
-          // ✅ sessão OK → dashboard
           navigate('/dashboard', { replace: true });
-          return;
+        } else {
+          navigate('/', { replace: true });
         }
-
-        // fallback de segurança
-        setTimeout(async () => {
-          const retry = await supabase.auth.getSession();
-          if (retry.data.session?.user && alive) {
-            navigate('/dashboard', { replace: true });
-          } else if (alive) {
-            navigate('/', { replace: true });
-          }
-        }, 800);
       } catch (err) {
         console.error('Fatal auth callback error:', err);
         navigate('/', { replace: true });
@@ -45,6 +42,7 @@ const AuthCallback = () => {
 
     return () => {
       alive = false;
+      clearTimeout(timeout);
     };
   }, [navigate]);
 
