@@ -51,7 +51,7 @@ const GoogleIcon = () => (
 const RegistrationModal: React.FC<RegistrationModalProps> = ({
   isOpen,
   onClose,
-  plan,
+  plan, // mantido por compat
   mode,
   isCompletingProfile = false,
   onSuccess,
@@ -72,32 +72,32 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
   });
 
   useEffect(() => {
-    if (isOpen) {
-      if (isCompletingProfile) {
-        supabase.auth.getUser().then(({ data }) => {
-          if (data.user) {
-            setFormData((prev) => ({
-              ...prev,
-              email: data.user?.email || '',
-              name:
-                data.user?.user_metadata?.full_name ||
-                data.user?.user_metadata?.name ||
-                '',
-            }));
-          }
-        });
-      } else {
-        setActiveMode(mode);
-      }
+    if (!isOpen) return;
 
-      setLoading(false);
-      setErrorMsg(null);
-      setSuccessMsg(null);
-      setShowPassword(false);
-      if (!isCompletingProfile) setFormData({ name: '', email: '', phone: '', password: '' });
+    // reset UI
+    setLoading(false);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setShowPassword(false);
+
+    if (isCompletingProfile) {
+      // preenche do supabase
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) {
+          setFormData((prev) => ({
+            ...prev,
+            email: data.user?.email || '',
+            name:
+              data.user?.user_metadata?.full_name ||
+              data.user?.user_metadata?.name ||
+              '',
+          }));
+        }
+      });
+    } else {
+      setActiveMode(mode);
+      setFormData({ name: '', email: '', phone: '', password: '' });
     }
-    // `plan` não muda o comportamento do modal aqui; mantido por compatibilidade
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mode, isCompletingProfile]);
 
   const friendlyAuthError = (msg: string) => {
@@ -106,8 +106,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
     if (m.includes('already registered') || m.includes('user already registered'))
       return 'Email already registered.';
     if (m.includes('invalid login credentials')) return 'Invalid credentials.';
-    if (m.includes('password should be at least'))
-      return 'Password too short (min 6 chars).';
+    if (m.includes('password should be at least')) return 'Password too short (min 6 chars).';
     if (m.includes('email not confirmed')) return 'Please confirm your email.';
     if (m.includes('duplicate key') || m.includes('already exists'))
       return 'Phone or Email already in use.';
@@ -115,13 +114,12 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
   };
 
   /**
-   * ✅ FIX DEFINITIVO (BrowserRouter + PKCE)
-   * - Não redirecionar pro /dashboard direto no OAuth, porque a sessão pode ainda não estar pronta.
-   * - Redireciona para /auth/callback (rota dedicada), que espera a sessão e então manda pro dashboard.
+   * ✅ OAuth: sempre manda para /auth/callback (rota dedicada)
    */
   const handleGoogleLogin = async () => {
     setLoading(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -134,15 +132,19 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setErrorMsg(friendlyAuthError(error.message));
       setLoading(false);
     }
+    // se não tiver erro, o browser vai redirecionar (não precisa setLoading(false))
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || successMsg) return;
+
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
+      // 1) Completar perfil
       if (isCompletingProfile) {
         const phoneDigits = onlyDigits(formData.phone);
         const fullName = formData.name.trim();
@@ -152,8 +154,10 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
         const {
           data: { user },
+          error: getUserErr,
         } = await supabase.auth.getUser();
 
+        if (getUserErr) console.warn('getUser error:', getUserErr);
         if (!user) throw new Error('User session not found');
 
         const { error: upsertError } = await supabase
@@ -171,7 +175,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         if (upsertError) {
           console.error('Upsert Error:', upsertError);
           if (
-            upsertError.code === '23505' ||
+            (upsertError as any).code === '23505' ||
             upsertError.message?.toLowerCase().includes('duplicate')
           ) {
             throw new Error(
@@ -182,10 +186,12 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         }
 
         setSuccessMsg(t.auth.successLogin);
-        setTimeout(() => onSuccess(), 1500);
+        setLoading(false);
+        onSuccess(); // ✅ imediato (App faz getSession + navega)
         return;
       }
 
+      // 2) Registro
       if (activeMode === 'register') {
         const email = (formData.email || '').trim().toLowerCase();
         const fullName = (formData.name || '').trim();
@@ -195,21 +201,23 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         if (!email) throw new Error(t.auth.errorRequired);
         if (!phoneDigits) throw new Error(t.auth.errorRequired);
         if (phoneDigits.length < 10) throw new Error(t.auth.errorPhone);
+        if (!formData.password) throw new Error(t.auth.errorRequired);
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: formData.password,
           options: {
-            // ✅ Mesma lógica do OAuth: cai em /auth/callback e de lá vai pro /dashboard
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
         if (authError) throw authError;
 
+        // Se exigir confirmação de email, pode não ter sessão imediata.
+        // Mostra mensagem e não trava.
         if (!authData.user) {
           setSuccessMsg(t.auth.successRegister);
-          setTimeout(() => onSuccess(), 2000);
+          setLoading(false);
           return;
         }
 
@@ -233,10 +241,12 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         }
 
         setSuccessMsg(t.auth.successRegister);
-        setTimeout(() => onSuccess(), 1500);
+        setLoading(false);
+        onSuccess(); // ✅ se sessão existir, App navega; se não, App lida com isso
         return;
       }
 
+      // 3) Login normal
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: (formData.email || '').trim().toLowerCase(),
         password: formData.password,
@@ -245,12 +255,13 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       if (loginError) throw loginError;
 
       setSuccessMsg(t.auth.successLogin);
-      setTimeout(() => onSuccess(), 1500);
+      setLoading(false);
+      onSuccess(); // ✅ imediato (não depende de timeout)
     } catch (error: any) {
       console.error('Auth Error:', error);
-      setLoading(false);
       const rawMsg = error?.message || error?.error_description || 'Error';
       setErrorMsg(friendlyAuthError(rawMsg));
+      setLoading(false);
     }
   };
 
@@ -322,14 +333,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {(activeMode === 'register' || isCompletingProfile) && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.auth.nameLabel}
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.nameLabel}</label>
                 <div className="relative">
-                  <UserIcon
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={18}
-                  />
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     type="text"
                     disabled={!!successMsg}
@@ -348,10 +354,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   {t.auth.phoneLabel} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Phone
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={18}
-                  />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     type="tel"
                     required
@@ -369,14 +372,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             {!isCompletingProfile && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.auth.emailLabel}
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.emailLabel}</label>
                   <div className="relative">
-                    <Mail
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      size={18}
-                    />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="email"
                       required
@@ -390,14 +388,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t.auth.passwordLabel}
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.passwordLabel}</label>
                   <div className="relative">
-                    <Lock
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      size={18}
-                    />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
@@ -477,8 +470,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   {activeMode === 'login' ? t.auth.noAccount : t.auth.hasAccount}
                   <button
                     onClick={() => {
-                      if (!loading && !successMsg)
-                        setActiveMode(activeMode === 'login' ? 'register' : 'login');
+                      if (!loading && !successMsg) setActiveMode(activeMode === 'login' ? 'register' : 'login');
                     }}
                     disabled={loading || !!successMsg}
                     className="ml-1 font-semibold text-brand-600 hover:text-brand-700 hover:underline disabled:opacity-50 disabled:no-underline"
