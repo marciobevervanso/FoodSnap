@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Scan, Menu, X, Zap, ArrowRight, Globe, Calculator, User } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { Scan, Menu, X, Zap, ArrowRight, Calculator, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface HeaderProps {
@@ -13,57 +13,25 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLoggedIn }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const { language, setLanguage, t } = useLanguage();
-  
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
-    { name: t.header.howItWorks, id: 'how-it-works' },
-    { name: t.header.features, id: 'features' },
-    { name: t.header.pricing, id: 'pricing' },
-  ];
-
-  const toggleLang = (lang: 'pt' | 'en' | 'es') => {
-    setLanguage(lang);
-    setLangMenuOpen(false);
-  };
-
   const handleScrollTo = (id: string) => {
     if (location.pathname !== '/') {
         navigate('/');
-        // Pequeno delay para esperar a navegação acontecer
         setTimeout(() => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth' });
-            }
-        }, 100);
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+        }, 150);
     } else {
-        const element = document.getElementById(id);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     }
     setMobileMenuOpen(false);
-  };
-
-  const handleLogoClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (location.pathname !== '/') {
-          navigate('/');
-      } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
   };
 
   return (
@@ -75,177 +43,74 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-        {/* Logo Professional */}
-        <a href="/" onClick={handleLogoClick} className="flex items-center gap-3 group">
-          <div className="relative flex items-center justify-center w-11 h-11 bg-brand-950 rounded-xl border border-brand-800 shadow-lg shadow-brand-900/20 group-hover:scale-105 transition-all duration-300 group-hover:shadow-brand-600/30">
-            <Scan size={24} className="text-brand-400 opacity-90 group-hover:opacity-100 transition-opacity" strokeWidth={1.25} />
-            <Zap size={14} className="absolute text-yellow-500 fill-yellow-500 -rotate-12 translate-y-0.5 translate-x-0.5 drop-shadow-sm" strokeWidth={1.5} />
+        <button onClick={() => navigate('/')} className="flex items-center gap-3 group text-left">
+          <div className="relative flex items-center justify-center w-11 h-11 bg-slate-950 rounded-xl border border-slate-800 shadow-lg group-hover:scale-105 transition-transform">
+            <Scan size={24} className="text-brand-400" strokeWidth={1.25} />
+            <Zap size={14} className="absolute text-yellow-500 fill-yellow-500 -rotate-12 translate-y-0.5 translate-x-0.5" />
           </div>
-          <div className="flex flex-col justify-center h-full">
-            <span className="text-2xl font-bold tracking-tight text-gray-900 leading-none group-hover:text-brand-900 transition-colors flex items-baseline gap-0.5">
-              FoodSnap<span className="text-brand-600 text-xl">.ai</span>
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold text-slate-900 leading-none">
+              FoodSnap<span className="text-brand-600">.ai</span>
             </span>
-            <span className="text-xs font-medium tracking-wide text-gray-500 mt-0.5 group-hover:text-brand-600/80 transition-colors">
-              {t.header.slogan}
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+              Nutrição Inteligente
             </span>
           </div>
-        </a>
+        </button>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <button 
-              key={link.name} 
-              onClick={() => handleScrollTo(link.id)}
-              className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors relative group"
-            >
-              {link.name}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-500 transition-all group-hover:w-full"></span>
-            </button>
-          ))}
-
-          {/* Tools Button - New Featured Item */}
+          <button onClick={() => handleScrollTo('how-it-works')} className="text-sm font-bold text-slate-600 hover:text-brand-600">Como Funciona</button>
+          <button onClick={() => handleScrollTo('features')} className="text-sm font-bold text-slate-600 hover:text-brand-600">Vantagens</button>
+          <button onClick={() => handleScrollTo('pricing')} className="text-sm font-bold text-slate-600 hover:text-brand-600">Preços</button>
+          
           <button 
             onClick={onOpenTools}
-            className="flex items-center gap-1.5 text-sm font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg border border-brand-200 transition-all hover:shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-black text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg border border-brand-200 uppercase tracking-tighter"
           >
-            <Calculator size={14} className="text-brand-600" />
-            {t.header.tools}
+            <Calculator size={14} /> Ferramentas
           </button>
 
-          <div className="h-6 w-px bg-gray-200 mx-1"></div>
-
-          {/* Language Selector */}
-          <div className="relative">
-            <button 
-              onClick={() => setLangMenuOpen(!langMenuOpen)}
-              className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors p-1"
-            >
-              <Globe size={16} />
-              <span className="uppercase">{language}</span>
-            </button>
-            
-            {langMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
-                {[
-                  { code: 'pt', label: 'Português' },
-                  { code: 'en', label: 'English' },
-                  { code: 'es', label: 'Español' }
-                ].map((l) => (
-                  <button
-                    key={l.code}
-                    onClick={() => toggleLang(l.code as any)}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${language === l.code ? 'text-brand-600 font-bold bg-brand-50' : 'text-gray-600'}`}
-                  >
-                    {l.label}
-                    {language === l.code && <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="h-6 w-px bg-slate-200" />
 
           {isLoggedIn ? (
             <button 
                 onClick={() => navigate('/dashboard')}
-                className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+                className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-brand-500/25 flex items-center gap-2"
             >
-                <User size={16} />
-                Meu Painel
+                <User size={16} /> Meu Painel
             </button>
           ) : (
             <>
-                <button 
-                    onClick={onLogin}
-                    className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                    {t.header.login}
-                </button>
-
+                <button onClick={onLogin} className="text-sm font-bold text-slate-600">Login</button>
                 <button 
                     onClick={onRegister}
-                    className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+                    className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-brand-500/25 flex items-center gap-2"
                 >
-                    {t.header.cta}
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    Testar Grátis <ArrowRight size={16} />
                 </button>
             </>
           )}
         </nav>
 
-        {/* Mobile Menu Toggle */}
-        <button 
-          className="md:hidden p-2 text-gray-600 hover:text-brand-600 transition-colors"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
+        <button className="md:hidden p-2 text-slate-600" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           {mobileMenuOpen ? <X /> : <Menu />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="absolute top-full left-0 right-0 bg-white border-t border-gray-100 shadow-xl md:hidden p-4 flex flex-col gap-4 animate-in slide-in-from-top-5 duration-200 h-[calc(100vh-80px)] overflow-y-auto">
-           {navLinks.map((link) => (
-            <button 
-              key={link.name} 
-              onClick={() => handleScrollTo(link.id)}
-              className="text-base font-medium text-gray-700 py-3 border-b border-gray-50 last:border-0 hover:text-brand-600 text-left"
-            >
-              {link.name}
-            </button>
-          ))}
-           
-           <button 
-             onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenTools();
-             }}
-             className="text-base font-bold text-brand-700 py-3 border-b border-gray-50 flex items-center gap-2"
-           >
-             <Calculator size={18} />
-             {t.header.tools}
-           </button>
-
-           <div className="flex gap-2 py-2">
-              <button onClick={() => toggleLang('pt')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'pt' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>PT</button>
-              <button onClick={() => toggleLang('en')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'en' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>EN</button>
-              <button onClick={() => toggleLang('es')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'es' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>ES</button>
-           </div>
-
-           <div className="flex flex-col gap-3 mt-2">
-            {isLoggedIn ? (
-                 <button 
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate('/dashboard');
-                  }}
-                  className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full flex items-center justify-center gap-2"
-                >
-                  <User size={18} /> Meu Painel
-                </button>
-            ) : (
-                <>
-                    <button 
-                        onClick={() => {
-                        setMobileMenuOpen(false);
-                        onLogin();
-                        }}
-                        className="text-gray-600 font-semibold py-2"
-                    >
-                        {t.header.login}
-                    </button>
-                    <button 
-                        onClick={() => {
-                            setMobileMenuOpen(false);
-                            onRegister();
-                        }}
-                        className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full"
-                    >
-                        {t.header.cta}
-                    </button>
-                </>
-            )}
-           </div>
+        <div className="absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-2xl md:hidden p-6 flex flex-col gap-4">
+           <button onClick={() => handleScrollTo('how-it-works')} className="text-left py-2 font-bold text-slate-700">Como Funciona</button>
+           <button onClick={() => handleScrollTo('features')} className="text-left py-2 font-bold text-slate-700">Vantagens</button>
+           <button onClick={() => handleScrollTo('pricing')} className="text-left py-2 font-bold text-slate-700">Preços</button>
+           <hr />
+           {isLoggedIn ? (
+             <button onClick={() => navigate('/dashboard')} className="bg-brand-600 text-white py-4 rounded-xl font-bold">Meu Painel</button>
+           ) : (
+             <div className="flex flex-col gap-3">
+               <button onClick={onLogin} className="py-2 font-bold text-slate-700">Login</button>
+               <button onClick={onRegister} className="bg-brand-600 text-white py-4 rounded-xl font-bold">Testar Grátis</button>
+             </div>
+           )}
         </div>
       )}
     </header>

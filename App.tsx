@@ -1,21 +1,17 @@
+
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
-import Hero from './components/Hero';
-import HowItWorks from './components/HowItWorks';
-import Features from './components/Features';
-import Testimonials from './components/Testimonials';
-import Pricing from './components/Pricing';
-import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import RegistrationModal from './components/RegistrationModal';
 import CalculatorsModal from './components/CalculatorsModal';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel'; 
 import FAQPage from './components/FAQPage';
+import Home from './pages/Home';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { User } from './types';
 
 // Componente Wrapper para proteger rotas privadas
@@ -45,18 +41,6 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
   return <>{children}</>;
 };
 
-// Componente da Home Page (Landing)
-const HomePage = ({ onRegister, onOpenTools }: { onRegister: (plan: string) => void, onOpenTools: () => void }) => (
-  <div className="flex flex-col min-h-screen">
-    <Hero onRegister={() => onRegister('starter')} />
-    <HowItWorks />
-    <Features />
-    <Testimonials />
-    <Pricing onRegister={onRegister} />
-    <FAQ />
-  </div>
-);
-
 const AppContent: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -69,6 +53,17 @@ const AppContent: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Correção para OAuth + HashRouter: Detecta e limpa tokens da URL antes que o Router se perca
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && (hash.includes('access_token=') || hash.includes('error='))) {
+      // É um retorno de OAuth do Supabase. 
+      // O Supabase irá processar isso automaticamente via onAuthStateChange.
+      // Nós apenas limpamos o hash para o HashRouter não tentar navegar para uma rota inexistente.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -100,9 +95,9 @@ const AppContent: React.FC = () => {
         navigate('/'); 
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
-           if (location.pathname === '/' || location.pathname === '') {
+           // Se estiver na home e logar, manda pro dashboard
+           if (window.location.hash === '#/' || window.location.hash === '') {
                navigate('/dashboard');
            }
         }
@@ -117,29 +112,16 @@ const AppContent: React.FC = () => {
 
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
-      let profile = null;
-      
-      for (let i = 0; i < 3; i++) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle(); 
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); 
 
-        if (error) throw error;
-
-        if (data) {
-          profile = data;
-          break;
-        }
-        
-        if (i < 2) await new Promise(r => setTimeout(r, 500));
-      }
+      if (error) throw error;
 
       if (!profile || !profile.phone_e164) {
-          console.warn("Perfil incompleto. Solicitando complemento.");
           setIsProfileIncomplete(true);
-          
           setUser({
             id: userId,
             name: profile?.full_name || email?.split('@')[0] || 'Usuário',
@@ -147,43 +129,42 @@ const AppContent: React.FC = () => {
             phone: '',
             public_id: profile?.public_id || '',
             plan: 'free',
-            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=10b981&color=fff`,
             is_admin: false
           });
-          setIsLoadingSession(false);
-          return;
+      } else {
+          setIsProfileIncomplete(false);
+
+          const { data: entitlement } = await supabase
+            .from('user_entitlements')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          let plan: 'free' | 'pro' | 'trial' = 'free';
+          if (entitlement) {
+            if (entitlement.entitlement_code === 'pro' && entitlement.is_active) plan = 'pro';
+            else if (entitlement.entitlement_code === 'trial' && entitlement.is_active) plan = 'trial';
+          }
+
+          setUser({
+            id: userId,
+            name: profile.full_name || 'Usuário',
+            email: profile.email || email || '',
+            phone: profile.phone_e164,
+            public_id: profile.public_id,
+            plan: plan,
+            plan_valid_until: entitlement?.valid_until,
+            avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=10b981&color=fff`,
+            is_admin: profile.is_admin || false 
+          });
       }
-
-      setIsProfileIncomplete(false);
-
-      const { data: entitlement } = await supabase
-        .from('user_entitlements')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      let plan: 'free' | 'pro' | 'trial' = 'free';
-      if (entitlement) {
-        if (entitlement.entitlement_code === 'pro' && entitlement.is_active) plan = 'pro';
-        else if (entitlement.entitlement_code === 'trial' && entitlement.is_active) plan = 'trial';
-      }
-
-      setUser({
-        id: userId,
-        name: profile.full_name || 'Usuário',
-        email: profile.email || email || '',
-        phone: profile.phone_e164,
-        public_id: profile.public_id,
-        plan: plan,
-        plan_valid_until: entitlement?.valid_until,
-        avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
-        is_admin: profile.is_admin || false 
-      });
-
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      setUser(null);
+      // Se houver erro, garantimos que o user não fique nulo se já existir sessão
+      if (!user) setUser(null);
     } finally {
+      // CRÍTICO: Sempre desativar o loading
       setIsLoadingSession(false);
     }
   };
@@ -200,7 +181,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    if (user?.id && user?.email) {
+    if (user?.id) {
         await fetchUserProfile(user.id, user.email);
     }
     setIsModalOpen(false);
@@ -214,40 +195,15 @@ const AppContent: React.FC = () => {
   if (isLoadingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
       </div>
     );
-  }
-
-  if (user && isProfileIncomplete) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
-             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
-             <RegistrationModal 
-                isOpen={true} 
-                onClose={() => {}} 
-                plan={selectedPlan}
-                mode="register"
-                isCompletingProfile={true}
-                onSuccess={handleAuthSuccess}
-             />
-             <div className="absolute bottom-8 left-0 right-0 text-center">
-                <button 
-                  onClick={handleLogout}
-                  className="text-gray-500 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 mx-auto transition-colors"
-                >
-                  <LogOut size={16} /> Cancelar e Sair
-                </button>
-             </div>
-        </div>
-      );
   }
 
   const isInternalPage = location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900 flex flex-col">
-      
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col w-full">
       {!isInternalPage && (
           <Header 
             onRegister={() => handleOpenRegister('starter')} 
@@ -259,10 +215,14 @@ const AppContent: React.FC = () => {
       
       <main className="flex-grow flex flex-col w-full">
         <Routes>
-            <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
-            
+            <Route path="/" element={
+              <Home 
+                onRegister={handleOpenRegister} 
+                onLogin={handleOpenLogin}
+                onOpenTools={() => setIsToolsOpen(true)} 
+              />
+            } />
             <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
-            
             <Route path="/dashboard" element={
                 <ProtectedRoute user={user} isLoading={isLoadingSession}>
                     <Dashboard 
@@ -272,7 +232,6 @@ const AppContent: React.FC = () => {
                     />
                 </ProtectedRoute>
             } />
-            
             <Route path="/admin" element={
                 <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
                     <AdminPanel 
@@ -282,9 +241,7 @@ const AppContent: React.FC = () => {
                     />
                 </ProtectedRoute>
             } />
-            
-            {/* Catch-all garantido */}
-            <Route path="*" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
@@ -293,10 +250,11 @@ const AppContent: React.FC = () => {
       )}
       
       <RegistrationModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isModalOpen || (!!user && isProfileIncomplete)} 
+        onClose={() => !isProfileIncomplete && setIsModalOpen(false)} 
         plan={selectedPlan}
-        mode={authMode}
+        mode={isProfileIncomplete ? 'register' : authMode}
+        isCompletingProfile={isProfileIncomplete}
         onSuccess={handleAuthSuccess}
       />
       
@@ -308,7 +266,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Usando HashRouter para máxima compatibilidade
 const App: React.FC = () => {
   return (
     <HashRouter>
