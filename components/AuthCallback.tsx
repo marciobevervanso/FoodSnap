@@ -1,55 +1,70 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/useAuth';
+import { supabase } from '../lib/supabase';
+import { Loader2 } from 'lucide-react';
 
-const cleanTrailingHash = () => {
-  // remove "…?#" ou "…#"
-  if (window.location.hash === '#' || window.location.href.endsWith('#')) {
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-  }
-};
-
-const AuthCallback: React.FC = () => {
+export default function AuthCallback() {
   const navigate = useNavigate();
-  const { refresh, user } = useAuth();
-  const [msg, setMsg] = useState('Finalizando login...');
 
   useEffect(() => {
-    let alive = true;
+    let cancelled = false;
 
-    (async () => {
-      cleanTrailingHash();
+    const cleanUrl = () => {
+      // remove query/hash do callback pra não reprocessar em refresh
+      window.history.replaceState({}, document.title, '/auth/callback');
+    };
 
-      // espera o Supabase processar o code -> session (PKCE)
-      // (detectSessionInUrl: true já faz boa parte, mas aqui garantimos)
-      for (let i = 0; i < 20; i++) {
-        if (!alive) return;
-        await refresh();
-        if (user) break;
-        await new Promise((r) => setTimeout(r, 150));
+    const finish = async () => {
+      try {
+        // 1) Se vier ?code=... (PKCE), troca por sessão de forma explícita
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('exchangeCodeForSession error:', error);
+            cleanUrl();
+            if (!cancelled) navigate('/', { replace: true });
+            return;
+          }
+
+          cleanUrl();
+          if (!cancelled) navigate('/dashboard', { replace: true });
+          return;
+        }
+
+        // 2) Se não tiver code, tenta pegar sessão normal
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('getSession error:', error);
+          cleanUrl();
+          if (!cancelled) navigate('/', { replace: true });
+          return;
+        }
+
+        cleanUrl();
+        if (!cancelled) {
+          navigate(data.session?.user ? '/dashboard' : '/', { replace: true });
+        }
+      } catch (e) {
+        console.error('AuthCallback fatal:', e);
+        cleanUrl();
+        if (!cancelled) navigate('/', { replace: true });
       }
+    };
 
-      if (!alive) return;
-
-      setMsg('Redirecionando...');
-      navigate('/dashboard', { replace: true });
-    })();
+    finish();
 
     return () => {
-      alive = false;
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
-        <div className="text-sm text-gray-600">{msg}</div>
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
+      <p className="text-gray-600 text-sm">Finalizando login...</p>
     </div>
   );
-};
-
-export default AuthCallback;
+}
