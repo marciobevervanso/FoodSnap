@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -29,7 +30,7 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({ chil
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -70,13 +71,29 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 1. SOLUÇÃO DO LOOP: Intercepta o hash do Supabase antes que o Router quebre
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && (hash.includes('access_token=') || hash.includes('type=recovery') || hash.includes('error='))) {
+      // É um retorno de autenticação. 
+      // O Supabase processa isso internamente, mas precisamos limpar a URL 
+      // para que o HashRouter não tente navegar para "#/access_token=..."
+      console.log("OAuth detectado no hash. Limpando para estabilidade do roteador.");
+      
+      // Remove o fragmento da URL visualmente, mantendo a funcionalidade do Supabase
+      setTimeout(() => {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }, 0);
+    }
+  }, []);
+
+  // 2. INICIALIZAÇÃO E LISTENER
   useEffect(() => {
     let mounted = true;
 
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (session?.user && mounted) {
            await fetchUserProfile(session.user.id, session.user.email);
         } else if (mounted) {
@@ -100,9 +117,9 @@ const AppContent: React.FC = () => {
         navigate('/'); 
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-           if (event === 'SIGNED_IN') await new Promise(r => setTimeout(r, 500));
            await fetchUserProfile(session.user.id, session.user.email);
-           if (location.pathname === '/' || location.pathname === '') {
+           // Se o usuário acabou de logar e está na home, manda pro dashboard
+           if (window.location.hash === '#/' || window.location.hash === '') {
                navigate('/dashboard');
            }
         }
@@ -117,29 +134,16 @@ const AppContent: React.FC = () => {
 
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
-      let profile = null;
-      
-      for (let i = 0; i < 3; i++) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle(); 
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle(); 
 
-        if (error) throw error;
-
-        if (data) {
-          profile = data;
-          break;
-        }
-        
-        if (i < 2) await new Promise(r => setTimeout(r, 500));
-      }
+      if (error) throw error;
 
       if (!profile || !profile.phone_e164) {
-          console.warn("Perfil incompleto. Solicitando complemento.");
           setIsProfileIncomplete(true);
-          
           setUser({
             id: userId,
             name: profile?.full_name || email?.split('@')[0] || 'Usuário',
@@ -150,39 +154,33 @@ const AppContent: React.FC = () => {
             avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
             is_admin: false
           });
-          setIsLoadingSession(false);
-          return;
+      } else {
+          setIsProfileIncomplete(false);
+          const { data: entitlement } = await supabase
+            .from('user_entitlements')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          let plan: 'free' | 'pro' | 'trial' = 'free';
+          if (entitlement && entitlement.is_active) {
+            plan = entitlement.entitlement_code as any;
+          }
+
+          setUser({
+            id: userId,
+            name: profile.full_name || 'Usuário',
+            email: profile.email || email || '',
+            phone: profile.phone_e164,
+            public_id: profile.public_id,
+            plan: plan,
+            plan_valid_until: entitlement?.valid_until,
+            avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
+            is_admin: profile.is_admin || false 
+          });
       }
-
-      setIsProfileIncomplete(false);
-
-      const { data: entitlement } = await supabase
-        .from('user_entitlements')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      let plan: 'free' | 'pro' | 'trial' = 'free';
-      if (entitlement) {
-        if (entitlement.entitlement_code === 'pro' && entitlement.is_active) plan = 'pro';
-        else if (entitlement.entitlement_code === 'trial' && entitlement.is_active) plan = 'trial';
-      }
-
-      setUser({
-        id: userId,
-        name: profile.full_name || 'Usuário',
-        email: profile.email || email || '',
-        phone: profile.phone_e164,
-        public_id: profile.public_id,
-        plan: plan,
-        plan_valid_until: entitlement?.valid_until,
-        avatar: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
-        is_admin: profile.is_admin || false 
-      });
-
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      setUser(null);
     } finally {
       setIsLoadingSession(false);
     }
@@ -200,7 +198,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    if (user?.id && user?.email) {
+    if (user?.id) {
         await fetchUserProfile(user.id, user.email);
     }
     setIsModalOpen(false);
@@ -208,46 +206,23 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    setIsLoadingSession(true);
     await supabase.auth.signOut();
   };
 
+  // Se estiver carregando a sessão, mostra um loader limpo
   if (isLoadingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
       </div>
     );
-  }
-
-  if (user && isProfileIncomplete) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
-             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-100 via-gray-50 to-gray-50 -z-10" />
-             <RegistrationModal 
-                isOpen={true} 
-                onClose={() => {}} 
-                plan={selectedPlan}
-                mode="register"
-                isCompletingProfile={true}
-                onSuccess={handleAuthSuccess}
-             />
-             <div className="absolute bottom-8 left-0 right-0 text-center">
-                <button 
-                  onClick={handleLogout}
-                  className="text-gray-500 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 mx-auto transition-colors"
-                >
-                  <LogOut size={16} /> Cancelar e Sair
-                </button>
-             </div>
-        </div>
-      );
   }
 
   const isInternalPage = location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-brand-100 selection:text-brand-900 flex flex-col">
-      
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col w-full">
       {!isInternalPage && (
           <Header 
             onRegister={() => handleOpenRegister('starter')} 
@@ -260,9 +235,7 @@ const AppContent: React.FC = () => {
       <main className="flex-grow flex flex-col w-full">
         <Routes>
             <Route path="/" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
-            
             <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
-            
             <Route path="/dashboard" element={
                 <ProtectedRoute user={user} isLoading={isLoadingSession}>
                     <Dashboard 
@@ -272,7 +245,6 @@ const AppContent: React.FC = () => {
                     />
                 </ProtectedRoute>
             } />
-            
             <Route path="/admin" element={
                 <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
                     <AdminPanel 
@@ -282,9 +254,7 @@ const AppContent: React.FC = () => {
                     />
                 </ProtectedRoute>
             } />
-            
-            {/* Catch-all garantido */}
-            <Route path="*" element={<HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
@@ -293,10 +263,11 @@ const AppContent: React.FC = () => {
       )}
       
       <RegistrationModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isModalOpen || (!!user && isProfileIncomplete)} 
+        onClose={() => !isProfileIncomplete && setIsModalOpen(false)} 
         plan={selectedPlan}
-        mode={authMode}
+        mode={isProfileIncomplete ? 'register' : authMode}
+        isCompletingProfile={isProfileIncomplete}
         onSuccess={handleAuthSuccess}
       />
       
@@ -308,7 +279,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Usando HashRouter para máxima compatibilidade
 const App: React.FC = () => {
   return (
     <HashRouter>
