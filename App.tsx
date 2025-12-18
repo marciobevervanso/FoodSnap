@@ -18,6 +18,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { supabase } from './lib/supabase';
 import { Loader2 } from 'lucide-react';
 import { User } from './types';
+import AuthCallback from './components/AuthCallback';
 
 interface ProtectedRouteProps {
   user: User | null;
