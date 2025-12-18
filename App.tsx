@@ -18,7 +18,6 @@ import { supabase } from './lib/supabase';
 import { Loader2 } from 'lucide-react';
 import { User } from './types';
 
-// Componente Wrapper para proteger rotas privadas
 interface ProtectedRouteProps {
   user: User | null;
   isLoading: boolean;
@@ -39,18 +38,13 @@ const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({
     );
   }
 
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
+  if (!user) return <Navigate to="/" replace />;
 
-  if (requiredAdmin && !user.is_admin) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (requiredAdmin && !user.is_admin) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 };
 
-// Componente da Home Page (Landing)
 const HomePage = ({
   onRegister,
   onOpenTools,
@@ -81,59 +75,6 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // INICIALIZAÇÃO E LISTENER
-  useEffect(() => {
-    let mounted = true;
-
-    const initAuth = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session?.user && mounted) {
-          await fetchUserProfile(session.user.id, session.user.email);
-        } else if (mounted) {
-          setIsLoadingSession(false);
-        }
-      } catch (err) {
-        console.error('Auth init error:', err);
-        if (mounted) setIsLoadingSession(false);
-      }
-    };
-
-    initAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setIsProfileIncomplete(false);
-        setIsLoadingSession(false);
-        navigate('/', { replace: true });
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          await fetchUserProfile(session.user.id, session.user.email);
-
-          // Se o usuário acabou de logar e está na home, manda pro dashboard
-          const path = window.location.pathname || '/';
-          if (path === '/' || path === '') {
-            navigate('/dashboard', { replace: true });
-          }
-        }
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const fetchUserProfile = async (userId: string, email?: string) => {
     try {
       const { data: profile, error } = await supabase
@@ -158,40 +99,130 @@ const AppContent: React.FC = () => {
             `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
           is_admin: false,
         });
-      } else {
-        setIsProfileIncomplete(false);
-
-        const { data: entitlement } = await supabase
-          .from('user_entitlements')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        let plan: 'free' | 'pro' | 'trial' = 'free';
-        if (entitlement && (entitlement as any).is_active) {
-          plan = (entitlement as any).entitlement_code as any;
-        }
-
-        setUser({
-          id: userId,
-          name: profile.full_name || 'Usuário',
-          email: profile.email || email || '',
-          phone: profile.phone_e164,
-          public_id: profile.public_id,
-          plan: plan,
-          plan_valid_until: (entitlement as any)?.valid_until,
-          avatar:
-            profile.avatar_url ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
-          is_admin: profile.is_admin || false,
-        });
+        return;
       }
+
+      setIsProfileIncomplete(false);
+
+      const { data: entitlement } = await supabase
+        .from('user_entitlements')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      let plan: 'free' | 'pro' | 'trial' = 'free';
+      if (entitlement && (entitlement as any).is_active) {
+        plan = (entitlement as any).entitlement_code as any;
+      }
+
+      setUser({
+        id: userId,
+        name: profile.full_name || 'Usuário',
+        email: profile.email || email || '',
+        phone: profile.phone_e164,
+        public_id: profile.public_id,
+        plan: plan,
+        plan_valid_until: (entitlement as any)?.valid_until,
+        avatar:
+          profile.avatar_url ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
+        is_admin: profile.is_admin || false,
+      });
     } catch (error) {
+      // ⚠️ Se perfil falhar por RLS/timeout, NÃO podemos travar o app pra sempre
       console.error('Error fetching user profile:', error);
+
+      setUser({
+        id: userId,
+        name: email?.split('@')[0] || 'Usuário',
+        email: email || '',
+        phone: '',
+        public_id: '',
+        plan: 'free',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
+        is_admin: false,
+      });
+
+      // Se não conseguiu ler o profile, força completar depois
+      setIsProfileIncomplete(true);
     } finally {
       setIsLoadingSession(false);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+
+    // ✅ Airbag: nunca fica loading eterno (rede lenta, auth travou, etc.)
+    const safety = window.setTimeout(() => {
+      if (mounted) setIsLoadingSession(false);
+    }, 6000);
+
+    const initAuth = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) console.warn('getSession error:', error);
+
+        if (!mounted) return;
+
+        if (data.session?.user) {
+          await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
+        } else {
+          setIsLoadingSession(false);
+        }
+      } catch (err) {
+        console.error('Auth init error:', err);
+        if (mounted) setIsLoadingSession(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      try {
+        // ✅ Trata também o boot oficial do Supabase
+        if (event === 'INITIAL_SESSION') {
+          if (session?.user) {
+            await fetchUserProfile(session.user.id, session.user.email || undefined);
+          } else {
+            setIsLoadingSession(false);
+          }
+          return;
+        }
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsProfileIncomplete(false);
+          setIsLoadingSession(false);
+          navigate('/', { replace: true });
+          return;
+        }
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            await fetchUserProfile(session.user.id, session.user.email || undefined);
+
+            const path = window.location.pathname || '/';
+            if (path === '/' || path === '') navigate('/dashboard', { replace: true });
+          } else {
+            setIsLoadingSession(false);
+          }
+        }
+      } catch (err) {
+        console.error('onAuthStateChange error:', err);
+        setIsLoadingSession(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(safety);
+      sub.subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenRegister = (plan: string = 'starter') => {
     setSelectedPlan(plan);
@@ -205,9 +236,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleAuthSuccess = async () => {
-    if (user?.id) {
-      await fetchUserProfile(user.id, user.email);
-    }
+    // Depois do login, o onAuthStateChange já vai puxar profile
     setIsModalOpen(false);
     navigate('/dashboard', { replace: true });
   };
@@ -217,7 +246,6 @@ const AppContent: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  // Se estiver carregando a sessão, mostra um loader limpo
   if (isLoadingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -245,13 +273,11 @@ const AppContent: React.FC = () => {
           <Route
             path="/"
             element={
-              <HomePage
-                onRegister={handleOpenRegister}
-                onOpenTools={() => setIsToolsOpen(true)}
-              />
+              <HomePage onRegister={handleOpenRegister} onOpenTools={() => setIsToolsOpen(true)} />
             }
           />
           <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
+
           <Route
             path="/dashboard"
             element={
@@ -264,10 +290,11 @@ const AppContent: React.FC = () => {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/admin"
             element={
-              <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin={true}>
+              <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin>
                 <AdminPanel
                   user={user!}
                   onExitAdmin={() => navigate('/dashboard')}
@@ -276,6 +303,7 @@ const AppContent: React.FC = () => {
               </ProtectedRoute>
             }
           />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
