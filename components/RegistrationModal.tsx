@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X, ArrowRight, Loader2, Lock, Mail, User as UserIcon,
-  Eye, EyeOff, Phone, CheckCircle, AlertCircle, LogOut
-} from 'lucide-react';
+import { X, ArrowRight, Loader2, Lock, Mail, User as UserIcon, Eye, EyeOff, Phone, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -26,19 +23,19 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const RegistrationModal: React.FC<RegistrationModalProps> = ({
-  isOpen,
-  onClose,
-  plan,
-  mode,
+const RegistrationModal: React.FC<RegistrationModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  plan, 
+  mode, 
   isCompletingProfile = false,
-  onSuccess
+  onSuccess 
 }) => {
   const { t } = useLanguage();
   const [activeMode, setActiveMode] = useState<'login' | 'register'>(mode);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
+  
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -53,18 +50,18 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
     if (isOpen) {
       if (isCompletingProfile) {
         supabase.auth.getUser().then(({ data }) => {
-          if (data.user) {
-            setFormData(prev => ({
-              ...prev,
-              email: data.user?.email || '',
-              name: (data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || ''),
-            }));
-          }
+           if (data.user) {
+             setFormData(prev => ({
+               ...prev,
+               email: data.user?.email || '',
+               name: data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || '',
+             }));
+           }
         });
       } else {
         setActiveMode(mode);
       }
-
+      
       setLoading(false);
       setErrorMsg(null);
       setSuccessMsg(null);
@@ -84,73 +81,18 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
     return msg || 'An error occurred.';
   };
 
-  /**
-   * ✅ FIX PRINCIPAL:
-   * Se seu app roda com HashRouter, o callback precisa incluir "/#/".
-   * Se não tiver hash, usa caminho normal.
-   *
-   * Preferência:
-   * - Se tiver "#/" na URL atual, assume HashRouter.
-   */
-  const isHashRouter = () => {
-    try {
-      return (window.location.hash || '').startsWith('#/');
-    } catch {
-      return false;
-    }
-  };
-
-  const getAuthCallbackUrl = () => {
-    const origin = window.location.origin;
-    // se você NÃO tem rota /auth/callback, troque por "/dashboard" abaixo
-    return isHashRouter()
-      ? `${origin}/#/auth/callback`
-      : `${origin}/auth/callback`;
-  };
-
-  const getDashboardUrl = () => {
-    const origin = window.location.origin;
-    return isHashRouter()
-      ? `${origin}/#/dashboard`
-      : `${origin}/dashboard`;
-  };
-
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setErrorMsg(null);
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // ✅ aqui era o bug: origin puro te joga na landing e perde estado
-        redirectTo: getAuthCallbackUrl()
+        redirectTo: window.location.origin
       }
     });
 
     if (error) {
       setErrorMsg(friendlyAuthError(error.message));
       setLoading(false);
-    }
-  };
-
-  /**
-   * ✅ Depois de login email/senha, garante que existe sessão
-   * e manda pro dashboard (em vez de voltar pra landing).
-   */
-  const finalizeToDashboard = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-
-      if (data.session) {
-        window.location.href = getDashboardUrl();
-      } else {
-        // se por algum motivo não criou sessão, cai pra landing
-        window.location.href = window.location.origin + (isHashRouter() ? '/#/' : '/');
-      }
-    } catch (e) {
-      console.error('finalizeToDashboard error:', e);
-      window.location.href = window.location.origin + (isHashRouter() ? '/#/' : '/');
     }
   };
 
@@ -162,40 +104,36 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
     try {
       if (isCompletingProfile) {
-        const phoneDigits = onlyDigits(formData.phone);
-        const fullName = formData.name.trim();
+          const phoneDigits = onlyDigits(formData.phone);
+          const fullName = formData.name.trim();
 
-        if (!fullName) throw new Error(t.auth.errorRequired);
-        if (!phoneDigits || phoneDigits.length < 10) throw new Error(t.auth.errorPhone);
+          if (!fullName) throw new Error(t.auth.errorRequired);
+          if (!phoneDigits || phoneDigits.length < 10) throw new Error(t.auth.errorPhone);
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User session not found");
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) throw new Error("User session not found");
 
-        const { error: upsertError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            full_name: fullName,
-            phone_e164: phoneDigits,
-            email: user.email
-          }, { onConflict: 'id' });
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({
+                id: user.id,
+                full_name: fullName,
+                phone_e164: phoneDigits,
+                email: user.email 
+            }, { onConflict: 'id' });
 
-        if (upsertError) {
-          console.error('Upsert Error:', upsertError);
-          if (upsertError.code === '23505' || upsertError.message?.toLowerCase().includes('duplicate')) {
-            throw new Error('Este telefone já está cadastrado em outra conta. Use outro número ou faça login na conta original.');
+          if (upsertError) {
+             console.error('Upsert Error:', upsertError);
+             if (upsertError.code === '23505' || upsertError.message?.toLowerCase().includes('duplicate')) {
+                 throw new Error('Este telefone já está cadastrado em outra conta. Use outro número ou faça login na conta original.');
+             }
+             throw new Error('Erro ao salvar perfil. Tente novamente.');
           }
-          throw new Error('Erro ao salvar perfil. Tente novamente.');
-        }
 
-        setSuccessMsg(t.auth.successLogin);
-
-        // ✅ depois de completar perfil, manda pro dashboard de forma segura
-        setTimeout(() => {
-          finalizeToDashboard();
-        }, 600);
-
-        return;
+          setSuccessMsg(t.auth.successLogin);
+          setTimeout(() => onSuccess(), 1500);
+          return;
       }
 
       if (activeMode === 'register') {
@@ -211,24 +149,41 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: formData.password,
-          options: {
-            // ✅ aqui era o bug também
-            emailRedirectTo: getAuthCallbackUrl()
-          }
+          options: { emailRedirectTo: window.location.origin }
         });
 
         if (authError) throw authError;
 
-        // Se o supabase exigir confirmação de email, pode não vir sessão.
-        setSuccessMsg(t.auth.successRegister);
-        setTimeout(() => {
-          onSuccess();
-        }, 1200);
+        if (!authData.user) {
+          setSuccessMsg(t.auth.successRegister);
+          setTimeout(() => onSuccess(), 2000);
+          return;
+        }
 
+        const { error: rpcError } = await supabase.rpc('register_user_profile', {
+          p_full_name: fullName,
+          p_phone: phoneDigits, 
+          p_email: email
+        });
+
+        if (rpcError) {
+             if (rpcError.message.includes('duplicate') || rpcError.message.includes('already exists')) {
+                 const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ full_name: fullName, phone_e164: phoneDigits })
+                    .eq('id', authData.user.id);
+                 
+                 if (updateError) throw new Error('Phone/Email already in use.');
+             } else {
+                 throw new Error('Phone/Email already in use.');
+             }
+        }
+
+        setSuccessMsg(t.auth.successRegister);
+        setTimeout(() => onSuccess(), 1500);
         return;
       }
 
-      // LOGIN normal
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: (formData.email || '').trim().toLowerCase(),
         password: formData.password
@@ -237,12 +192,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       if (loginError) throw loginError;
 
       setSuccessMsg(t.auth.successLogin);
-
-      // ✅ aqui é o fix: em vez de "onSuccess" te mandar pra landing,
-      // finaliza a sessão e vai pro dashboard certo (hash ou não)
-      setTimeout(() => {
-        finalizeToDashboard();
-      }, 400);
+      setTimeout(() => onSuccess(), 1500);
 
     } catch (error: any) {
       console.error('Auth Error:', error);
@@ -259,17 +209,19 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-      <div
+      <div 
         onClick={isCompletingProfile ? undefined : onClose}
         className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity opacity-100"
       />
 
-      <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transition-all transform scale-100 opacity-100 animate-[fadeIn_0.2s_ease-out]">
+      <div 
+        className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transition-all transform scale-100 opacity-100 animate-[fadeIn_0.2s_ease-out]"
+      >
         {isCompletingProfile && (
-          <button
+          <button 
             onClick={async () => {
-              await supabase.auth.signOut();
-              window.location.href = window.location.origin + (isHashRouter() ? '/#/' : '/');
+                await supabase.auth.signOut();
+                window.location.reload();
             }}
             className="absolute top-4 right-4 text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all flex items-center gap-1 text-xs font-medium bg-white border border-gray-100 shadow-sm"
             title="Sair desta conta"
@@ -285,9 +237,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
             </div>
             {!isCompletingProfile && (
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
                 <X size={20} />
-              </button>
+                </button>
             )}
           </div>
 
@@ -306,6 +258,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            
             {(activeMode === 'register' || isCompletingProfile) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.nameLabel}</label>
@@ -325,9 +278,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
             {(activeMode === 'register' || isCompletingProfile) && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.auth.phoneLabel} <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.phoneLabel} <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
@@ -345,47 +296,47 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
             )}
 
             {!isCompletingProfile && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.emailLabel}</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                      type="email"
-                      required
-                      disabled={!!successMsg}
-                      className="w-full bg-white text-gray-900 pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-all placeholder-gray-400 disabled:bg-gray-50"
-                      placeholder="user@example.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    />
-                  </div>
-                </div>
+                <>
+                    <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.emailLabel}</label>
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                        type="email"
+                        required
+                        disabled={!!successMsg}
+                        className="w-full bg-white text-gray-900 pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-all placeholder-gray-400 disabled:bg-gray-50"
+                        placeholder="user@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        />
+                    </div>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.passwordLabel}</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      disabled={!!successMsg}
-                      className="w-full bg-white text-gray-900 pl-10 pr-10 py-3 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-all placeholder-gray-400 disabled:bg-gray-50"
-                      placeholder="******"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      disabled={!!successMsg}
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-              </>
+                    <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.auth.passwordLabel}</label>
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        disabled={!!successMsg}
+                        className="w-full bg-white text-gray-900 pl-10 pr-10 py-3 rounded-xl border border-gray-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition-all placeholder-gray-400 disabled:bg-gray-50"
+                        placeholder="******"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        />
+                        <button
+                        type="button"
+                        disabled={!!successMsg}
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
+                    </div>
+                </>
             )}
 
             <div className="pt-2">
@@ -393,7 +344,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 type="submit"
                 disabled={loading || !!successMsg}
                 className={`w-full font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-80 disabled:cursor-not-allowed ${
-                  successMsg ? 'bg-green-600 text-white shadow-green-500/25' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/25'
+                    successMsg 
+                        ? 'bg-green-600 text-white shadow-green-500/25' 
+                        : 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/25'
                 }`}
               >
                 {loading ? (
@@ -414,35 +367,37 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           </form>
 
           {!isCompletingProfile && (
-            <div className="mt-6">
-              <div className="relative mb-6">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-                <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">{t.auth.or}</span></div>
-              </div>
+              <div className="mt-6">
+                 <div className="relative mb-6">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+                    <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">{t.auth.or}</span></div>
+                 </div>
 
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={loading || !!successMsg}
-                className="w-full bg-white text-gray-700 font-semibold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-3 shadow-sm"
-              >
-                <GoogleIcon />
-                {t.auth.googleBtn}
-              </button>
-
-              <div className="mt-6 text-center text-sm">
-                <p className="text-gray-500">
-                  {activeMode === 'login' ? t.auth.noAccount : t.auth.hasAccount}
-                  <button
-                    onClick={() => { if (!loading && !successMsg) setActiveMode(activeMode === 'login' ? 'register' : 'login'); }}
+                 <button
+                    type="button"
+                    onClick={handleGoogleLogin}
                     disabled={loading || !!successMsg}
-                    className="ml-1 font-semibold text-brand-600 hover:text-brand-700 hover:underline disabled:opacity-50 disabled:no-underline"
-                  >
-                    {activeMode === 'login' ? t.auth.registerLink : t.auth.loginLink}
-                  </button>
-                </p>
+                    className="w-full bg-white text-gray-700 font-semibold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-3 shadow-sm"
+                 >
+                    <GoogleIcon />
+                    {t.auth.googleBtn}
+                 </button>
+
+                <div className="mt-6 text-center text-sm">
+                    <p className="text-gray-500">
+                    {activeMode === 'login' ? t.auth.noAccount : t.auth.hasAccount}
+                    <button
+                        onClick={() => {
+                            if(!loading && !successMsg) setActiveMode(activeMode === 'login' ? 'register' : 'login');
+                        }}
+                        disabled={loading || !!successMsg}
+                        className="ml-1 font-semibold text-brand-600 hover:text-brand-700 hover:underline disabled:opacity-50 disabled:no-underline"
+                    >
+                        {activeMode === 'login' ? t.auth.registerLink : t.auth.loginLink}
+                    </button>
+                    </p>
+                </div>
               </div>
-            </div>
           )}
         </div>
 
