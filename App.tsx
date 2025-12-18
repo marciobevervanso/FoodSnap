@@ -1,148 +1,104 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+// App.tsx (FINAL)
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import Header from './components/Header';
+import Footer from './components/Footer';
+import Dashboard from './components/Dashboard';
+import AdminPanel from './components/AdminPanel';
+import FAQPage from './components/FAQPage';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
 import Features from './components/Features';
 import Testimonials from './components/Testimonials';
 import Pricing from './components/Pricing';
 import FAQ from './components/FAQ';
-import Footer from './components/Footer';
-import RegistrationModal from './components/RegistrationModal';
-import CalculatorsModal from './components/CalculatorsModal';
-import Dashboard from './components/Dashboard';
-import AdminPanel from './components/AdminPanel';
-import FAQPage from './components/FAQPage';
 import AuthCallback from './components/AuthCallback';
-import ProtectedRoute from './components/ProtectedRoute';
 
 import { LanguageProvider } from './contexts/LanguageContext';
-import { AuthProvider } from './auth/AuthProvider';
-import { useAuth } from './auth/useAuth';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 
-const HomePage = ({
-  onRegister,
-  onOpenTools,
-}: {
-  onRegister: (plan: string) => void;
-  onOpenTools: () => void;
-}) => (
+const HomePage = () => (
   <div className="flex flex-col min-h-screen">
-    <Hero onRegister={() => onRegister('starter')} />
+    <Hero />
     <HowItWorks />
     <Features />
     <Testimonials />
-    <Pricing onRegister={onRegister} />
+    <Pricing />
     <FAQ />
   </div>
 );
 
-const AppRoutes: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
-  const [selectedPlan, setSelectedPlan] = useState('starter');
-
-  const navigate = useNavigate();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; admin?: boolean }> = ({
+  children,
+  admin = false,
+}) => {
+  const { user, loading } = useAuth();
   const location = useLocation();
 
-  const { user, isLoading, isProfileIncomplete, refresh, signOut } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span>Carregando…</span>
+      </div>
+    );
+  }
 
-  const handleOpenRegister = (plan: string = 'starter') => {
-    setSelectedPlan(plan);
-    setAuthMode('register');
-    setIsModalOpen(true);
-  };
+  if (!user) {
+    return <Navigate to="/" replace state={{ from: location }} />;
+  }
 
-  const handleOpenLogin = () => {
-    setAuthMode('login');
-    setIsModalOpen(true);
-  };
+  if (admin && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
-  // depois de login/senha ou completar perfil: só garante refresh e manda pro dashboard
-  const handleAuthSuccess = async () => {
-    setIsModalOpen(false);
-    await refresh();
-    navigate('/dashboard', { replace: true });
-  };
+  return <>{children}</>;
+};
 
-  const isInternalPage =
-    location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const internal = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col w-full">
-      {!isInternalPage && (
-        <Header
-          onRegister={() => handleOpenRegister('starter')}
-          onLogin={handleOpenLogin}
-          onOpenTools={() => setIsToolsOpen(true)}
-          isLoggedIn={!!user}
-        />
-      )}
-
-      <main className="flex-grow flex flex-col w-full">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <HomePage
-                onRegister={handleOpenRegister}
-                onOpenTools={() => setIsToolsOpen(true)}
-              />
-            }
-          />
-
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute user={user} isLoading={isLoading}>
-                <Dashboard
-                  user={user!}
-                  onLogout={signOut}
-                  onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined}
-                />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute user={user} isLoading={isLoading} requiredAdmin>
-                <AdminPanel
-                  user={user!}
-                  onExitAdmin={() => navigate('/dashboard')}
-                  onLogout={signOut}
-                />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-
-      {!isInternalPage && <Footer onRegister={() => handleOpenRegister('starter')} />}
-
-      <RegistrationModal
-        isOpen={isModalOpen || (!!user && isProfileIncomplete)}
-        onClose={() => !isProfileIncomplete && setIsModalOpen(false)}
-        plan={selectedPlan}
-        mode={isProfileIncomplete ? 'register' : authMode}
-        isCompletingProfile={isProfileIncomplete}
-        onSuccess={handleAuthSuccess}
-      />
-
-      <CalculatorsModal isOpen={isToolsOpen} onClose={() => setIsToolsOpen(false)} />
-    </div>
+    <>
+      {!internal && <Header />}
+      {children}
+      {!internal && <Footer />}
+    </>
   );
 };
 
-const App: React.FC = () => {
+const AppRoutes = () => (
+  <Layout>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/faq" element={<FAQPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute admin>
+            <AdminPanel />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </Layout>
+);
+
+export default function App() {
   return (
     <BrowserRouter>
       <LanguageProvider>
@@ -152,6 +108,4 @@ const App: React.FC = () => {
       </LanguageProvider>
     </BrowserRouter>
   );
-};
-
-export default App;
+}
