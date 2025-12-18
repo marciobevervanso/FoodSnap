@@ -1,39 +1,47 @@
-import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
-import { Loader2 } from "lucide-react";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Loader2 } from 'lucide-react';
 
-const AuthCallback: React.FC = () => {
+const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    const finishAuth = async () => {
       try {
-        const url = window.location.href;
+        // 🔑 ISSO É O MAIS IMPORTANTE
+        const { data, error } = await supabase.auth.getSession();
 
-        // Se tiver ?code=..., troca por session (PKCE)
-        if (window.location.search.includes("code=")) {
-          const { error } = await supabase.auth.exchangeCodeForSession(url);
-          if (error) console.warn("exchangeCodeForSession:", error);
+        if (error) {
+          console.error('Auth callback error:', error);
+          navigate('/', { replace: true });
+          return;
         }
 
-        // ✅ LIMPA TUDO: remove ?code=... e também o "#"
-        window.history.replaceState({}, "", "/auth/callback");
-
-        // Agora pega sessão e vai pro dashboard
-        const { data } = await supabase.auth.getSession();
         if (data.session?.user) {
-          if (alive) navigate("/dashboard", { replace: true });
-        } else {
-          if (alive) navigate("/", { replace: true });
+          // ✅ sessão OK → dashboard
+          navigate('/dashboard', { replace: true });
+          return;
         }
-      } catch (e) {
-        console.error("AuthCallback error:", e);
-        if (alive) navigate("/", { replace: true });
+
+        // fallback de segurança
+        setTimeout(async () => {
+          const retry = await supabase.auth.getSession();
+          if (retry.data.session?.user && alive) {
+            navigate('/dashboard', { replace: true });
+          } else if (alive) {
+            navigate('/', { replace: true });
+          }
+        }, 800);
+      } catch (err) {
+        console.error('Fatal auth callback error:', err);
+        navigate('/', { replace: true });
       }
-    })();
+    };
+
+    finishAuth();
 
     return () => {
       alive = false;
