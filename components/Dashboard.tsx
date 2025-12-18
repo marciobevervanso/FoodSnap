@@ -14,6 +14,8 @@ import {
   Smartphone,
   QrCode,
   CheckCircle2,
+  Check,
+  Star,
 } from 'lucide-react';
 import { User } from '../types';
 import { supabase } from '../lib/supabase';
@@ -35,6 +37,42 @@ type AccessSummary = {
   can_use_paid: boolean;
 };
 
+type PlanCode = 'mensal' | 'trimestral' | 'anual';
+
+const PLAN_OPTIONS: Array<{
+  code: PlanCode;
+  title: string;
+  price: string;
+  period: string;
+  note?: string;
+  highlight?: boolean;
+  features: string[];
+}> = [
+  {
+    code: 'mensal',
+    title: 'Plano Mensal',
+    price: 'R$ 49,90',
+    period: '/ mês',
+    features: ['Análises ilimitadas', 'Relatórios detalhados', 'Suporte prioritário'],
+  },
+  {
+    code: 'anual',
+    title: 'Plano Anual',
+    price: 'R$ 358,80',
+    period: '/ ano',
+    note: 'Melhor custo-benefício',
+    highlight: true,
+    features: ['Análises ilimitadas', 'Relatórios detalhados', 'Suporte prioritário', 'Economia no anual'],
+  },
+  {
+    code: 'trimestral',
+    title: 'Plano Trimestral',
+    price: 'R$ 119,70',
+    period: '/ 3 meses',
+    features: ['Análises ilimitadas', 'Relatórios detalhados', 'Suporte prioritário'],
+  },
+];
+
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) => {
   const { t, language } = useLanguage();
 
@@ -47,9 +85,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
 
   const [whatsappNumber, setWhatsappNumber] = useState('5541999999999');
 
-  // ✅ NOVO: resumo de acesso (free quota / plano / validade)
+  // ✅ resumo acesso
   const [access, setAccess] = useState<AccessSummary | null>(null);
   const [loadingAccess, setLoadingAccess] = useState(false);
+
+  // ✅ checkout/portal
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHistory();
@@ -97,7 +139,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
     }
   };
 
-  // ✅ NOVO: busca da view (ou tabela) de resumo de acesso
   const fetchAccess = async () => {
     setLoadingAccess(true);
     try {
@@ -226,19 +267,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
     }
   };
 
-  const handleStripePortal = () => {
-    alert('Redirecionando para o Portal do Cliente Stripe...');
-    window.open('https://billing.stripe.com/p/login/test', '_blank');
-  };
-
-  const getPlanLabelFromUser = () => {
-    if (user.plan === 'pro') return 'PRO';
-    if (user.plan === 'trial') return 'Trial';
-    if (language === 'pt') return 'Gratuito';
-    if (language === 'es') return 'Gratis';
-    return 'Free';
-  };
-
   const planLabelFromCode = (code?: string) => {
     const c = (code || 'free').toLowerCase();
     if (c === 'free') return language === 'pt' ? 'Gratuito' : 'Free';
@@ -250,10 +278,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
     return c.toUpperCase();
   };
 
-  const planName = planLabelFromCode(access?.plan_code) || getPlanLabelFromUser();
+  const planName = planLabelFromCode(access?.plan_code) || (language === 'pt' ? 'Gratuito' : 'Free');
   const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
-
   const isPaidActive = !!access?.can_use_paid && access?.plan_code !== 'free';
+
+  // ✅ NOVO: abre Stripe Billing Portal via Edge Function
+  const handleStripePortal = async () => {
+    setBillingError(null);
+    setBillingBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-portal', {});
+      if (error) throw error;
+      const url = (data as any)?.url;
+      if (!url) throw new Error('Portal URL not returned');
+      window.location.href = url;
+    } catch (e: any) {
+      console.error(e);
+      setBillingError(e?.message || 'Falha ao abrir Portal do Cliente');
+    } finally {
+      setBillingBusy(false);
+    }
+  };
+
+  // ✅ NOVO: cria Checkout Session via Edge Function e redireciona
+  const handleUpgrade = async (plan: PlanCode) => {
+    setBillingError(null);
+    setBillingBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: { plan },
+      });
+      if (error) throw error;
+      const url = (data as any)?.url;
+      if (!url) throw new Error('Checkout URL not returned');
+      window.location.href = url;
+    } catch (e: any) {
+      console.error(e);
+      setBillingError(e?.message || 'Falha ao iniciar pagamento');
+    } finally {
+      setBillingBusy(false);
+    }
+  };
+
+  const whatsappCta = `https://wa.me/${whatsappNumber}?text=Oi`;
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-gray-900">
@@ -378,9 +445,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                     : 'Plano ativo'
                 }
                 icon={<CreditCard className="text-brand-500" />}
-                highlight={isPaidActive || user.plan === 'trial'}
+                highlight={isPaidActive || access?.plan_code === 'trial'}
               />
             </div>
+
+            {/* CTA Upgrade rápido */}
+            {!isPaidActive && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Desbloqueie análises ilimitadas</p>
+                  <p className="text-sm text-gray-500">
+                    Escolha um plano e finalize no Stripe em segundos.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('subscription')}
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors"
+                >
+                  Ver planos
+                </button>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm mb-10 flex flex-col md:flex-row gap-8 items-center relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2"></div>
@@ -404,7 +489,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
 
                 <div className="flex flex-wrap gap-3 pt-2">
                   <button
-                    onClick={() => window.open(whatsappUrl, '_blank')}
+                    onClick={() => window.open(whatsappCta, '_blank')}
                     className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-green-500/20 hover:-translate-y-0.5"
                   >
                     <MessageCircle size={20} />
@@ -544,13 +629,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
         )}
 
         {activeTab === 'subscription' && (
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <header className="mb-8">
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t.dashboard.subTitle}</h1>
               <p className="text-gray-500">{t.dashboard.subDesc}</p>
             </header>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
               <div className="p-8 border-b border-gray-100">
                 <div className="flex justify-between items-start">
                   <div>
@@ -559,7 +644,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                     </p>
                     <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                       {loadingAccess ? '...' : planName}
-                      {(isPaidActive || user.plan === 'trial') && (
+                      {(isPaidActive || access?.plan_code === 'trial') && (
                         <span className="text-xs bg-brand-100 text-brand-700 px-2 py-1 rounded-full border border-brand-200">
                           Ativo
                         </span>
@@ -603,24 +688,97 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onOpenAdmin }) =>
                 <p className="text-sm text-gray-500 text-center sm:text-left">{t.dashboard.portalText}</p>
                 <button
                   onClick={handleStripePortal}
-                  className="bg-white border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm shadow-sm"
+                  disabled={billingBusy}
+                  className="bg-white border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <ExternalLink size={16} />
+                  {billingBusy ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
                   {t.dashboard.btnPortal}
                 </button>
               </div>
             </div>
 
-            {(access?.plan_code?.toLowerCase() === 'free' || !isPaidActive) && (
-              <div className="mt-8 bg-brand-900 rounded-2xl p-8 text-white relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-xl font-bold mb-2">{t.dashboard.upgradeTitle}</h3>
-                  <p className="text-brand-100 mb-6 max-w-lg">{t.dashboard.upgradeDesc}</p>
-                  <button className="bg-brand-500 hover:bg-brand-400 text-brand-950 font-bold px-6 py-3 rounded-xl transition-colors">
-                    {t.dashboard.btnUpgrade}
-                  </button>
+            {billingError && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {billingError}
+              </div>
+            )}
+
+            {/* ✅ NOVO: 3 opções de planos (upgrade) */}
+            {!isPaidActive && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8">
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Escolha seu plano</h3>
+                    <p className="text-gray-500 text-sm">
+                      Você está no gratuito. Faça upgrade e finalize direto no Stripe.
+                    </p>
+                  </div>
                 </div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500 rounded-full blur-[80px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {PLAN_OPTIONS.map((p) => (
+                    <div
+                      key={p.code}
+                      className={`rounded-2xl border p-5 flex flex-col ${
+                        p.highlight
+                          ? 'border-brand-300 bg-brand-50 shadow-sm'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-gray-900">{p.title}</p>
+                            {p.highlight && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide bg-brand-600 text-white px-2 py-1 rounded-full">
+                                <Star size={12} /> Destaque
+                              </span>
+                            )}
+                          </div>
+                          {p.note && <p className="text-xs text-gray-500 mt-1">{p.note}</p>}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 mb-4">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-extrabold text-gray-900">{p.price}</span>
+                          <span className="text-sm text-gray-500">{p.period}</span>
+                        </div>
+                      </div>
+
+                      <ul className="space-y-2 text-sm text-gray-600 flex-1">
+                        {p.features.map((f, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <Check size={16} className="text-brand-600 mt-0.5" />
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <button
+                        onClick={() => handleUpgrade(p.code)}
+                        disabled={billingBusy}
+                        className={`mt-5 w-full rounded-xl font-bold py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                          p.highlight
+                            ? 'bg-brand-700 hover:bg-brand-800 text-white'
+                            : 'bg-gray-900 hover:bg-gray-800 text-white'
+                        }`}
+                      >
+                        {billingBusy ? (
+                          <span className="inline-flex items-center justify-center gap-2">
+                            <Loader2 size={16} className="animate-spin" /> Abrindo Stripe...
+                          </span>
+                        ) : (
+                          'Assinar agora'
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs text-gray-400 mt-4">
+                  Pagamento e cancelamento são gerenciados pelo Stripe. Você volta automaticamente pro app após finalizar.
+                </p>
               </div>
             )}
           </div>
