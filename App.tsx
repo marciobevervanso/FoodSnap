@@ -16,8 +16,8 @@ import FAQ from './components/FAQ';
 import AuthCallback from './components/AuthCallback';
 
 import { LanguageProvider } from './contexts/LanguageContext';
-import { AuthProvider, useAuth } from './auth/AuthProvider';
-
+import { AuthProvider } from './auth/AuthProvider';
+import { useAuth } from './auth/useAuth';
 const HomePage = () => (
   <div className="flex flex-col min-h-screen">
     <Hero />
