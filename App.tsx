@@ -1,4 +1,4 @@
-// src/App.tsx
+// App.tsx
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -137,7 +137,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Auth init + listener (com "airbag" pra não travar no loader)
   useEffect(() => {
     let mounted = true;
 
@@ -202,7 +201,6 @@ const AppContent: React.FC = () => {
     };
   }, [navigate]);
 
-  // UI handlers (mantém “Área do Membro” funcionando)
   const handleOpenRegister = (plan: string = 'starter') => {
     setSelectedPlan(plan);
     setAuthMode('register');
@@ -214,7 +212,6 @@ const AppContent: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // ✅ NÃO depende de `user` local (que ainda pode ser null)
   const handleAuthSuccess = async () => {
     setIsModalOpen(false);
     setIsLoadingSession(true);
@@ -274,6 +271,9 @@ const AppContent: React.FC = () => {
               />
             }
           />
+
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
           <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
 
           <Route
