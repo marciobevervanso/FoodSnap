@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Loader2 } from "lucide-react";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
 
@@ -12,17 +10,29 @@ const AuthCallback: React.FC = () => {
     let alive = true;
 
     (async () => {
-      // Espera o Supabase trocar o "code" por session (PKCE)
-      for (let i = 0; i < 40; i++) {
+      try {
+        const url = window.location.href;
+
+        // Se tiver ?code=..., troca por session (PKCE)
+        if (window.location.search.includes("code=")) {
+          const { error } = await supabase.auth.exchangeCodeForSession(url);
+          if (error) console.warn("exchangeCodeForSession:", error);
+        }
+
+        // ✅ LIMPA TUDO: remove ?code=... e também o "#"
+        window.history.replaceState({}, "", "/auth/callback");
+
+        // Agora pega sessão e vai pro dashboard
         const { data } = await supabase.auth.getSession();
         if (data.session?.user) {
           if (alive) navigate("/dashboard", { replace: true });
-          return;
+        } else {
+          if (alive) navigate("/", { replace: true });
         }
-        await sleep(150);
+      } catch (e) {
+        console.error("AuthCallback error:", e);
+        if (alive) navigate("/", { replace: true });
       }
-
-      if (alive) navigate("/", { replace: true });
     })();
 
     return () => {
