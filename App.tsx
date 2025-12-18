@@ -1,4 +1,4 @@
-// App.tsx
+// App.tsx - VERSÃO CORRIGIDA
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -164,8 +164,11 @@ const AppContent: React.FC = () => {
 
     initAuth();
 
+    // ✅ CORREÇÃO: Removida a navegação automática daqui
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+
+      console.log('🔐 Auth event:', event); // debug útil
 
       try {
         if (event === 'SIGNED_OUT') {
@@ -176,17 +179,19 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           if (session?.user) {
             await fetchUserProfile(session.user.id, session.user.email || undefined);
-
-            const path = window.location.pathname || '/';
-            if (path === '/' || path === '') {
-              navigate('/dashboard', { replace: true });
-            }
+            // ❌ REMOVIDO: navigate('/dashboard') daqui
+            // O AuthCallback ou handleAuthSuccess é que fazem isso
           } else {
             setIsLoadingSession(false);
           }
+        }
+
+        // ✅ INITIAL_SESSION não faz nada além de carregar o perfil
+        if (event === 'INITIAL_SESSION' && session?.user) {
+          await fetchUserProfile(session.user.id, session.user.email || undefined);
         }
       } catch (err) {
         console.error('onAuthStateChange error:', err);
@@ -222,7 +227,11 @@ const AppContent: React.FC = () => {
 
       if (data.session?.user) {
         await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
-        navigate('/dashboard', { replace: true });
+        
+        // ✅ Só navega se não estiver em /auth/callback
+        if (!window.location.pathname.includes('/auth/callback')) {
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         setIsLoadingSession(false);
         navigate('/', { replace: true });
