@@ -15,17 +15,22 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // ✅ Fecha menus automaticamente quando trocar de rota
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setLangMenuOpen(false);
+  }, [location.pathname]);
 
   const navLinks = [
     { name: t.header.howItWorks, id: 'how-it-works' },
@@ -38,44 +43,50 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
     setLangMenuOpen(false);
   };
 
+  const scrollToId = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) element.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const handleScrollTo = (id: string) => {
-    if (location.pathname !== '/') {
-        navigate('/');
-        // Pequeno delay para esperar a navegação acontecer
-        setTimeout(() => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth' });
-            }
-        }, 100);
-    } else {
-        const element = document.getElementById(id);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
     setMobileMenuOpen(false);
+
+    if (location.pathname !== '/') {
+      navigate('/');
+      // Pequeno delay para esperar a navegação
+      window.setTimeout(() => scrollToId(id), 150);
+      return;
+    }
+
+    scrollToId(id);
   };
 
   const handleLogoClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (location.pathname !== '/') {
-          navigate('/');
-      } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+    e.preventDefault();
+    setMobileMenuOpen(false);
+    setLangMenuOpen(false);
+
+    if (location.pathname !== '/') {
+      navigate('/');
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goDashboard = () => {
+    setMobileMenuOpen(false);
+    setLangMenuOpen(false);
+    navigate('/dashboard');
   };
 
   return (
-    <header 
+    <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
-        isScrolled 
-          ? 'bg-white/95 backdrop-blur-xl border-gray-200 py-3 shadow-sm' 
-          : 'bg-transparent border-transparent py-6'
+        isScrolled ? 'bg-white/95 backdrop-blur-xl border-gray-200 py-3 shadow-sm' : 'bg-transparent border-transparent py-6'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-        {/* Logo Professional */}
+        {/* Logo */}
         <a href="/" onClick={handleLogoClick} className="flex items-center gap-3 group">
           <div className="relative flex items-center justify-center w-11 h-11 bg-brand-950 rounded-xl border border-brand-800 shadow-lg shadow-brand-900/20 group-hover:scale-105 transition-all duration-300 group-hover:shadow-brand-600/30">
             <Scan size={24} className="text-brand-400 opacity-90 group-hover:opacity-100 transition-opacity" strokeWidth={1.25} />
@@ -94,8 +105,8 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
-            <button 
-              key={link.name} 
+            <button
+              key={link.name}
               onClick={() => handleScrollTo(link.id)}
               className="text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors relative group"
             >
@@ -104,8 +115,7 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
             </button>
           ))}
 
-          {/* Tools Button - New Featured Item */}
-          <button 
+          <button
             onClick={onOpenTools}
             className="flex items-center gap-1.5 text-sm font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg border border-brand-200 transition-all hover:shadow-sm"
           >
@@ -117,25 +127,27 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
 
           {/* Language Selector */}
           <div className="relative">
-            <button 
-              onClick={() => setLangMenuOpen(!langMenuOpen)}
+            <button
+              onClick={() => setLangMenuOpen((v) => !v)}
               className="flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-brand-600 transition-colors p-1"
             >
               <Globe size={16} />
               <span className="uppercase">{language}</span>
             </button>
-            
+
             {langMenuOpen && (
               <div className="absolute top-full right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
                 {[
                   { code: 'pt', label: 'Português' },
                   { code: 'en', label: 'English' },
-                  { code: 'es', label: 'Español' }
+                  { code: 'es', label: 'Español' },
                 ].map((l) => (
                   <button
                     key={l.code}
                     onClick={() => toggleLang(l.code as any)}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${language === l.code ? 'text-brand-600 font-bold bg-brand-50' : 'text-gray-600'}`}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${
+                      language === l.code ? 'text-brand-600 font-bold bg-brand-50' : 'text-gray-600'
+                    }`}
                   >
                     {l.label}
                     {language === l.code && <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
@@ -146,37 +158,36 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
           </div>
 
           {isLoggedIn ? (
-            <button 
-                onClick={() => navigate('/dashboard')}
-                className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+            <button
+              onClick={goDashboard}
+              className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
             >
-                <User size={16} />
-                Meu Painel
+              <User size={16} />
+              Meu Painel
             </button>
           ) : (
             <>
-                <button 
-                    onClick={onLogin}
-                    className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                    {t.header.login}
-                </button>
+              <button onClick={onLogin} className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
+                {t.header.login}
+              </button>
 
-                <button 
-                    onClick={onRegister}
-                    className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
-                >
-                    {t.header.cta}
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                </button>
+              <button
+                onClick={onRegister}
+                className="group bg-brand-600 hover:bg-brand-700 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2 hover:-translate-y-0.5 cursor-pointer"
+              >
+                {t.header.cta}
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </button>
             </>
           )}
         </nav>
 
         {/* Mobile Menu Toggle */}
-        <button 
+        <button
           className="md:hidden p-2 text-gray-600 hover:text-brand-600 transition-colors"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          onClick={() => setMobileMenuOpen((v) => !v)} // ✅ setter funcional (evita bug de estado)
+          aria-label="Abrir menu"
+          aria-expanded={mobileMenuOpen}
         >
           {mobileMenuOpen ? <X /> : <Menu />}
         </button>
@@ -185,67 +196,64 @@ const Header: React.FC<HeaderProps> = ({ onRegister, onLogin, onOpenTools, isLog
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="absolute top-full left-0 right-0 bg-white border-t border-gray-100 shadow-xl md:hidden p-4 flex flex-col gap-4 animate-in slide-in-from-top-5 duration-200 h-[calc(100vh-80px)] overflow-y-auto">
-           {navLinks.map((link) => (
-            <button 
-              key={link.name} 
+          {navLinks.map((link) => (
+            <button
+              key={link.name}
               onClick={() => handleScrollTo(link.id)}
               className="text-base font-medium text-gray-700 py-3 border-b border-gray-50 last:border-0 hover:text-brand-600 text-left"
             >
               {link.name}
             </button>
           ))}
-           
-           <button 
-             onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenTools();
-             }}
-             className="text-base font-bold text-brand-700 py-3 border-b border-gray-50 flex items-center gap-2"
-           >
-             <Calculator size={18} />
-             {t.header.tools}
-           </button>
 
-           <div className="flex gap-2 py-2">
-              <button onClick={() => toggleLang('pt')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'pt' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>PT</button>
-              <button onClick={() => toggleLang('en')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'en' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>EN</button>
-              <button onClick={() => toggleLang('es')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'es' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>ES</button>
-           </div>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenTools();
+            }}
+            className="text-base font-bold text-brand-700 py-3 border-b border-gray-50 flex items-center gap-2"
+          >
+            <Calculator size={18} />
+            {t.header.tools}
+          </button>
 
-           <div className="flex flex-col gap-3 mt-2">
+          <div className="flex gap-2 py-2">
+            <button onClick={() => toggleLang('pt')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'pt' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>PT</button>
+            <button onClick={() => toggleLang('en')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'en' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>EN</button>
+            <button onClick={() => toggleLang('es')} className={`flex-1 py-2 rounded-lg text-sm border ${language === 'es' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>ES</button>
+          </div>
+
+          <div className="flex flex-col gap-3 mt-2">
             {isLoggedIn ? (
-                 <button 
+              <button
+                onClick={goDashboard}
+                className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full flex items-center justify-center gap-2"
+              >
+                <User size={18} /> Meu Painel
+              </button>
+            ) : (
+              <>
+                <button
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    navigate('/dashboard');
+                    onLogin();
                   }}
-                  className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full flex items-center justify-center gap-2"
+                  className="text-gray-600 font-semibold py-2"
                 >
-                  <User size={18} /> Meu Painel
+                  {t.header.login}
                 </button>
-            ) : (
-                <>
-                    <button 
-                        onClick={() => {
-                        setMobileMenuOpen(false);
-                        onLogin();
-                        }}
-                        className="text-gray-600 font-semibold py-2"
-                    >
-                        {t.header.login}
-                    </button>
-                    <button 
-                        onClick={() => {
-                            setMobileMenuOpen(false);
-                            onRegister();
-                        }}
-                        className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full"
-                    >
-                        {t.header.cta}
-                    </button>
-                </>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onRegister();
+                  }}
+                  className="bg-brand-600 text-white text-center py-3.5 rounded-xl font-semibold shadow-md w-full"
+                >
+                  {t.header.cta}
+                </button>
+              </>
             )}
-           </div>
+          </div>
         </div>
       )}
     </header>
