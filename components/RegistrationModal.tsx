@@ -96,6 +96,8 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setShowPassword(false);
       if (!isCompletingProfile) setFormData({ name: '', email: '', phone: '', password: '' });
     }
+    // `plan` não muda o comportamento do modal aqui; mantido por compatibilidade
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, mode, isCompletingProfile]);
 
   const friendlyAuthError = (msg: string) => {
@@ -113,10 +115,9 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
   };
 
   /**
-   * IMPORTANTE (BrowserRouter):
-   * - Não usar redirectTo = origin puro (vai cair na home e você "some" do dashboard).
-   * - Mandar direto pro /dashboard.
-   * - Evita hash e mantém fluxo estável com PKCE.
+   * ✅ FIX DEFINITIVO (BrowserRouter + PKCE)
+   * - Não redirecionar pro /dashboard direto no OAuth, porque a sessão pode ainda não estar pronta.
+   * - Redireciona para /auth/callback (rota dedicada), que espera a sessão e então manda pro dashboard.
    */
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -125,7 +126,7 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
@@ -199,8 +200,8 @@ const RegistrationModal: React.FC<RegistrationModalProps> = ({
           email,
           password: formData.password,
           options: {
-            // BrowserRouter: manda pro dashboard depois do clique no e-mail
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            // ✅ Mesma lógica do OAuth: cai em /auth/callback e de lá vai pro /dashboard
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
