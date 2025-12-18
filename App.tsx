@@ -1,6 +1,6 @@
-// App.tsx - VERSÃO CORRIGIDA
-import React, { useState, useEffect, PropsWithChildren } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -14,37 +14,12 @@ import CalculatorsModal from './components/CalculatorsModal';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
 import FAQPage from './components/FAQPage';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { supabase } from './lib/supabase';
-import { Loader2 } from 'lucide-react';
-import { User } from './types';
 import AuthCallback from './components/AuthCallback';
+import ProtectedRoute from './components/ProtectedRoute';
 
-interface ProtectedRouteProps {
-  user: User | null;
-  isLoading: boolean;
-  requiredAdmin?: boolean;
-}
-
-const ProtectedRoute: React.FC<PropsWithChildren<ProtectedRouteProps>> = ({
-  children,
-  user,
-  isLoading,
-  requiredAdmin = false,
-}) => {
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/" replace />;
-  if (requiredAdmin && !user.is_admin) return <Navigate to="/dashboard" replace />;
-
-  return <>{children}</>;
-};
+import { LanguageProvider } from './contexts/LanguageContext';
+import { AuthProvider } from './auth/AuthProvider';
+import { useAuth } from './auth/useAuth';
 
 const HomePage = ({
   onRegister,
@@ -63,148 +38,16 @@ const HomePage = ({
   </div>
 );
 
-const AppContent: React.FC = () => {
+const AppRoutes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [selectedPlan, setSelectedPlan] = useState('starter');
 
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
-
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fetchUserProfile = async (userId: string, email?: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!profile || !profile.phone_e164) {
-        setIsProfileIncomplete(true);
-        setUser({
-          id: userId,
-          name: profile?.full_name || email?.split('@')[0] || 'Usuário',
-          email: profile?.email || email || '',
-          phone: '',
-          public_id: profile?.public_id || '',
-          plan: 'free',
-          avatar:
-            profile?.avatar_url ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(email || 'User')}&background=059669&color=fff`,
-          is_admin: false,
-        });
-        return;
-      }
-
-      setIsProfileIncomplete(false);
-
-      const { data: entitlement } = await supabase
-        .from('user_entitlements')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      let plan: 'free' | 'pro' | 'trial' = 'free';
-      if (entitlement && (entitlement as any).is_active) {
-        plan = (entitlement as any).entitlement_code as any;
-      }
-
-      setUser({
-        id: userId,
-        name: profile.full_name || 'Usuário',
-        email: profile.email || email || '',
-        phone: profile.phone_e164,
-        public_id: profile.public_id,
-        plan,
-        plan_valid_until: (entitlement as any)?.valid_until,
-        avatar:
-          profile.avatar_url ||
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'User')}&background=059669&color=fff`,
-        is_admin: profile.is_admin || false,
-      });
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
-      setUser(null);
-    } finally {
-      setIsLoadingSession(false);
-    }
-  };
-
-  useEffect(() => {
-    let mounted = true;
-
-    const safety = window.setTimeout(() => {
-      if (mounted) setIsLoadingSession(false);
-    }, 8000);
-
-    const initAuth = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) console.warn('getSession error:', error);
-
-        if (!mounted) return;
-
-        if (data.session?.user) {
-          await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
-        } else {
-          setIsLoadingSession(false);
-        }
-      } catch (err) {
-        console.error('Auth init error:', err);
-        if (mounted) setIsLoadingSession(false);
-      }
-    };
-
-    initAuth();
-
-    // ✅ CORREÇÃO: Removida a navegação automática daqui
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      console.log('🔐 Auth event:', event); // debug útil
-
-      try {
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setIsProfileIncomplete(false);
-          setIsLoadingSession(false);
-          navigate('/', { replace: true });
-          return;
-        }
-
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          if (session?.user) {
-            await fetchUserProfile(session.user.id, session.user.email || undefined);
-            // ❌ REMOVIDO: navigate('/dashboard') daqui
-            // O AuthCallback ou handleAuthSuccess é que fazem isso
-          } else {
-            setIsLoadingSession(false);
-          }
-        }
-
-        // ✅ INITIAL_SESSION não faz nada além de carregar o perfil
-        if (event === 'INITIAL_SESSION' && session?.user) {
-          await fetchUserProfile(session.user.id, session.user.email || undefined);
-        }
-      } catch (err) {
-        console.error('onAuthStateChange error:', err);
-        setIsLoadingSession(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      window.clearTimeout(safety);
-      sub.subscription.unsubscribe();
-    };
-  }, [navigate]);
+  const { user, isLoading, isProfileIncomplete, refresh, signOut } = useAuth();
 
   const handleOpenRegister = (plan: string = 'starter') => {
     setSelectedPlan(plan);
@@ -217,43 +60,12 @@ const AppContent: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // depois de login/senha ou completar perfil: só garante refresh e manda pro dashboard
   const handleAuthSuccess = async () => {
     setIsModalOpen(false);
-    setIsLoadingSession(true);
-
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) console.warn('getSession after auth error:', error);
-
-      if (data.session?.user) {
-        await fetchUserProfile(data.session.user.id, data.session.user.email || undefined);
-        
-        // ✅ Só navega se não estiver em /auth/callback
-        if (!window.location.pathname.includes('/auth/callback')) {
-          navigate('/dashboard', { replace: true });
-        }
-      } else {
-        setIsLoadingSession(false);
-        navigate('/', { replace: true });
-      }
-    } catch (err) {
-      console.error('handleAuthSuccess error:', err);
-      setIsLoadingSession(false);
-    }
+    await refresh();
+    navigate('/dashboard', { replace: true });
   };
-
-  const handleLogout = async () => {
-    setIsLoadingSession(true);
-    await supabase.auth.signOut();
-  };
-
-  if (isLoadingSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
-      </div>
-    );
-  }
 
   const isInternalPage =
     location.pathname.includes('/dashboard') || location.pathname.includes('/admin');
@@ -282,16 +94,15 @@ const AppContent: React.FC = () => {
           />
 
           <Route path="/auth/callback" element={<AuthCallback />} />
-
           <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
 
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute user={user} isLoading={isLoadingSession}>
+              <ProtectedRoute user={user} isLoading={isLoading}>
                 <Dashboard
                   user={user!}
-                  onLogout={handleLogout}
+                  onLogout={signOut}
                   onOpenAdmin={user?.is_admin ? () => navigate('/admin') : undefined}
                 />
               </ProtectedRoute>
@@ -301,11 +112,11 @@ const AppContent: React.FC = () => {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute user={user} isLoading={isLoadingSession} requiredAdmin>
+              <ProtectedRoute user={user} isLoading={isLoading} requiredAdmin>
                 <AdminPanel
                   user={user!}
                   onExitAdmin={() => navigate('/dashboard')}
-                  onLogout={handleLogout}
+                  onLogout={signOut}
                 />
               </ProtectedRoute>
             }
@@ -335,7 +146,9 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <LanguageProvider>
-        <AppContent />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>
   );
